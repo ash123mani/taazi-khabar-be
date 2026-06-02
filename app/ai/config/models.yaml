@@ -1,0 +1,24 @@
+models:
+  summarizer:
+    active: "meta/llama-3.1-8b-instruct"
+    candidates:
+      - name: "meta/llama-3.1-8b-instruct"
+        provider: "nim"
+        max_tokens: 1024
+        temperature: 0.2
+      - name: "mistralai/mistral-7b-instruct-v0.3"
+        provider: "nim"
+        max_tokens: 1024
+        temperature: 0.2
+
+  question_setter:
+    active: "meta/llama-3.1-70b-instruct"
+    candidates:
+      - name: "meta/llama-3.1-70b-instruct"
+        provider: "nim"
+        max_tokens: 2048
+        temperature: 0.4
+      - name: "meta/llama-3.1-8b-instruct"
+        provider: "nim"
+        max_tokens: 2048
+        temperature: 0.4

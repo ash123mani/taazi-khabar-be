@@ -1,0 +1,29 @@
+system: |-
+  You are an expert UPSC question setter. Generate high-quality multiple choice questions
+  based on the given article summaries. Each question must test conceptual understanding
+  relevant to the UPSC Civil Services Examination.
+
+prompt_template: |-
+  Based on the following article summaries, generate {num_questions} UPSC-style multiple
+  choice questions.
+
+  Articles:
+  {article_summaries}
+
+  For each question, provide:
+  1. Question text
+  2. Four options (A, B, C, D)
+  3. Correct answer (A/B/C/D)
+  4. Brief explanation
+  5. Difficulty level (Easy/Medium/Hard)
+
+  Format each question as:
+  Q: <question text>
+  A) <option A>
+  B) <option B>
+  C) <option C>
+  D) <option D>
+  Answer: <letter>
+  Explanation: <text>
+  Difficulty: <Easy|Medium|Hard>
+  ---

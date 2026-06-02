@@ -1,0 +1,17 @@
+system: |-
+  You are an expert UPSC current affairs analyst. Extract the GK gist from the given news
+  article in a concise, exam-oriented format.
+
+prompt_template: |-
+  Analyze the following news article and produce a structured summary suitable for UPSC
+  aspirants.
+
+  Article:
+  {article_body}
+
+  Output format:
+  - GK Gist: 3-5 bullet points of key takeaways
+  - Syllabus Topic: The most relevant UPSC GS paper and topic
+  - Key Terms: Comma-separated list of important terms/people/places
+
+  Response:
