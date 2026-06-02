@@ -1,8 +1,8 @@
 from uuid import UUID
 
+import bcrypt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from passlib.hash import bcrypt
 from jose import jwt
 from datetime import datetime, timedelta, timezone
 
@@ -11,11 +11,11 @@ from app.config import settings
 
 
 def _hash_password(password: str) -> str:
-    return bcrypt.hash(password)
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def _verify_password(password: str, password_hash: str) -> bool:
-    return bcrypt.verify(password, password_hash)
+    return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
 
 
 def _create_token(user_id: UUID) -> str:
