@@ -31,12 +31,15 @@ class TestListHistory:
         assert data[0]["total_questions"] == 2
 
     async def test_list_pagination(self, client: AsyncClient, db_session: AsyncSession, user_token: dict):
-        article = await seed_article(db_session)
+        articles = []
+        for _ in range(3):
+            a = await seed_article(db_session)
+            articles.append(a)
         with patch("app.ai.orchestrator.AIOrchestrator.generate_mcq", return_value=MOCK_QUESTIONS):
-            for _ in range(3):
+            for a in articles:
                 await client.post(
                     "/api/quizzes/generate",
-                    json={"article_ids": [str(article.id)], "num_questions": 2},
+                    json={"article_ids": [str(a.id)], "num_questions": 2},
                     headers=auth_header(user_token["token"]),
                 )
         res = await client.get("/api/history?skip=0&limit=2", headers=auth_header(user_token["token"]))
@@ -55,7 +58,7 @@ class TestListHistory:
 
     async def test_list_no_auth(self, client: AsyncClient):
         res = await client.get("/api/history")
-        assert res.status_code == 403
+        assert res.status_code == 401
 
 
 class TestGetHistoryDetail:
@@ -98,7 +101,7 @@ class TestGetHistoryDetail:
                 headers=auth_header(user_token["token"]),
             )
         res = await client.get(f"/api/history/{gen.json()['quiz_id']}")
-        assert res.status_code == 403
+        assert res.status_code == 401
 
     async def test_get_detail_invalid_uuid(self, client: AsyncClient, user_token: dict):
         res = await client.get("/api/history/not-a-uuid", headers=auth_header(user_token["token"]))

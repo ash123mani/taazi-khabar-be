@@ -21,8 +21,14 @@ class BaseScraper(ABC):
         self.rate_limit_delay = rate_limit_delay
 
     async def fetch_rss(self) -> list[dict]:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            response = await client.get(self.rss_url, headers={
+                "User-Agent": "Mozilla/5.0 (compatible; TaaziKhabar/1.0)"
+            })
+            response.raise_for_status()
+
         loop = asyncio.get_running_loop()
-        feed = await loop.run_in_executor(None, feedparser.parse, self.rss_url)
+        feed = await loop.run_in_executor(None, feedparser.parse, response.text)
         entries = []
         for entry in feed.entries:
             entries.append({
@@ -44,7 +50,10 @@ class BaseScraper(ABC):
         async with httpx.AsyncClient(timeout=30.0) as client:
             for entry in entries:
                 await asyncio.sleep(self.rate_limit_delay)
-                body = await self.extract_body(entry["link"], client)
+                try:
+                    body = await self.extract_body(entry["link"], client)
+                except (httpx.HTTPStatusError, httpx.TimeoutException):
+                    continue
                 if body:
                     articles.append(
                         ScrapedArticle(

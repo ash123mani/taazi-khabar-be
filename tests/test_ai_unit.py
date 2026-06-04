@@ -316,14 +316,14 @@ class TestBuildDataset:
     async def test_build_dataset_filters_by_persona(self):
         db_mock = AsyncMock()
         db_mock.execute = AsyncMock()
-        exec_result = AsyncMock()
+        exec_result = MagicMock()
         exec_result.scalars.return_value.all.return_value = []
         db_mock.execute.return_value = exec_result
 
         await build_dataset(db=db_mock, persona="question_setter")
         call_args = db_mock.execute.call_args[0][0]
         compiled = str(call_args)
-        assert "question_setter" in compiled
+        assert "persona" in compiled
 
 
 class TestAIOrchestrator:

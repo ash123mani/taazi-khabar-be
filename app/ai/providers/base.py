@@ -15,8 +15,14 @@ class BaseProvider(ABC):
         self,
         prompt: str,
         system: str,
+        model: str = "",
+        api_key: str = "",
+        base_url: str = "",
         max_tokens: int = 512,
         temperature: float = 0.3,
+        top_p: float = 1.0,
+        frequency_penalty: float = 0.0,
+        presence_penalty: float = 0.0,
     ) -> ProviderResponse:
         ...
 
@@ -26,5 +32,7 @@ class BaseProvider(ABC):
         prompt: str,
         system: str,
         lora_adapter: str,
+        api_key: str = "",
+        base_url: str = "",
     ) -> ProviderResponse:
         ...

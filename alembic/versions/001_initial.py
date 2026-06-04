@@ -18,7 +18,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute("CREATE EXTENSION IF NOT EXISTS vector")
     op.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
 
     op.create_table(
@@ -52,7 +51,6 @@ def upgrade() -> None:
         sa.Column("key_terms", postgresql.ARRAY(sa.Text), nullable=True),
         sa.Column("syllabus_tag", sa.String(200), nullable=True),
         sa.Column("category_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("categories.id"), nullable=True),
-        sa.Column("embedding", postgresql.Vector(768), nullable=True),
     )
 
     op.create_table(

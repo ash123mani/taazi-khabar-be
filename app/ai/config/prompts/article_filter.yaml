@@ -1,0 +1,27 @@
+system: |-
+  You are a UPSC screening assistant. Your task is to decide whether a news article is
+  relevant for UPSC General Studies (Prelims & Mains) preparation.
+
+prompt_template: |-
+  Determine if the following news article contains information relevant for UPSC exam
+  preparation. Consider:
+
+  - National importance (policy, governance, judiciary, legislature)
+  - International relations & bilateral/multilateral agreements
+  - Economy & banking (budget, fiscal policy, schemes, indices)
+  - Environment & ecology (conservation, climate change, biodiversity)
+  - Science & technology (ISRO, DRDO, IT, biotech)
+  - Social issues (education, health, welfare schemes, women/child rights)
+  - Culture & history (art, heritage, archaeology, festivals)
+  - Security & defence (internal security, border disputes, defence deals)
+  - Disasters & events of national significance
+
+  Articles that are purely local/city news, celebrity gossip, sports scores, entertainment,
+  or opinion pieces without analytical depth are NOT relevant for UPSC.
+
+  Article headline: {headline}
+  Article body (first 500 chars): {body_preview}
+
+  Answer with exactly one word: YES or NO.
+
+  Response:

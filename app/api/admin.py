@@ -1,15 +1,459 @@
+from datetime import date, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select, func, cast, Date
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import get_db, get_admin_user
 from app.models.user import User
+from app.models.article import Article
 from app.models.ai_interaction import AIInteraction
 from app.ai.model_registry import registry
 from app.services import training_service
 
 router = APIRouter()
+
+
+@router.get("/scrape-dates", response_model=dict)
+async def list_scrape_dates(
+    days: int = Query(30, ge=1, le=90),
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Article.source, cast(Article.published_at, Date).label("d"))
+        .distinct()
+        .order_by(Article.source, cast(Article.published_at, Date).desc())
+    )
+    scraped: dict[str, set[str]] = {}
+    for row in result:
+        scraped.setdefault(row.source, set()).add(row.d.isoformat())
+
+    today = date.today()
+    date_range = [(today - timedelta(days=i)).isoformat() for i in range(days)]
+
+    sources = ["the_hindu", "indian_express"]
+    dates_dto = {}
+    for source in sources:
+        dates_dto[source] = [
+            {"date": d, "scraped": d in scraped.get(source, set())}
+            for d in date_range
+        ]
+
+    return {"dates": dates_dto}
+
+
+@router.post("/scrape-date", response_model=dict)
+async def scrape_date(
+    data: dict,
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    source = data.get("source")
+    target_date = data.get("date")
+
+    if source not in ("the_hindu", "indian_express"):
+        raise HTTPException(status_code=400, detail="source must be the_hindu or indian_express")
+    if not target_date:
+        raise HTTPException(status_code=400, detail="date is required (YYYY-MM-DD)")
+
+    from app.scrapers.the_hindu import TheHinduScraper
+    from app.scrapers.indian_express import IndianExpressScraper
+    from app.services.article_service import bulk_upsert_articles
+    from app.ai.orchestrator import AIOrchestrator
+
+    scraper = TheHinduScraper() if source == "the_hindu" else IndianExpressScraper()
+
+    try:
+        articles = await scraper.scrape()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Scrape failed: {e}")
+
+    filtered = [a for a in articles if a.published_at[:10] == target_date]
+
+    orchestrator = AIOrchestrator()
+
+    async def summarize(body: str, article_id=None, db=None):
+        return await orchestrator.summarize_article(article_body=body, article_id=article_id, db=db)
+
+    async def filterer(headline: str, body_text: str):
+        return await orchestrator.filter_article(headline=headline, body_text=body_text, db=db)
+
+    created, skipped, summary_errors, filtered_out = await bulk_upsert_articles(
+        db=db,
+        articles=filtered,
+        summarizer=summarize,
+        article_filter=filterer,
+    )
+
+    return {
+        "source": source,
+        "date": target_date,
+        "articles_found": len(filtered),
+        "articles_created": created,
+        "articles_skipped": skipped,
+        "articles_filtered_out": filtered_out,
+        "errors": summary_errors,
+    }
+
+
+@router.get("/articles", response_model=dict)
+async def admin_list_articles(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    search: str | None = Query(None),
+    source: str | None = Query(None),
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services import article_service
+    
+    query = select(Article).order_by(Article.published_at.desc())
+    count_query = select(func.count()).select_from(Article)
+    
+    if search:
+        search_term = f"%{search}%"
+        query = query.where(
+            (Article.headline.ilike(search_term)) |
+            (Article.url.ilike(search_term))
+        )
+        count_query = count_query.where(
+            (Article.headline.ilike(search_term)) |
+            (Article.url.ilike(search_term))
+        )
+    
+    if source:
+        query = query.where(Article.source == source)
+        count_query = count_query.where(Article.source == source)
+    
+    count_result = await db.execute(count_query)
+    total = count_result.scalar()
+    
+    result = await db.execute(query.offset(skip).limit(limit))
+    articles = result.scalars().all()
+    
+    return {
+        "total": total,
+        "articles": [
+            {
+                "id": str(a.id),
+                "source": a.source,
+                "headline": a.headline,
+                "url": a.url,
+                "published_at": a.published_at.isoformat(),
+                "gk_summary": a.gk_summary,
+                "key_terms": a.key_terms,
+                "syllabus_tag": a.syllabus_tag,
+                "scraped_at": a.scraped_at.isoformat() if a.scraped_at else None,
+            }
+            for a in articles
+        ],
+    }
+
+
+@router.delete("/articles/{article_id}", response_model=dict)
+async def admin_delete_article(
+    article_id: UUID,
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Article).where(Article.id == article_id))
+    article = result.scalar_one_or_none()
+    
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+    
+    await db.delete(article)
+    await db.commit()
+    
+    return {"status": "deleted", "id": str(article_id)}
+
+
+@router.get("/categories", response_model=dict)
+async def admin_list_categories(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    search: str | None = Query(None),
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    query = select(Category).order_by(Category.name.asc())
+    count_query = select(func.count()).select_from(Category)
+    
+    if search:
+        search_term = f"%{search}%"
+        query = query.where(Category.name.ilike(search_term))
+        count_query = count_query.where(Category.name.ilike(search_term))
+    
+    count_result = await db.execute(count_query)
+    total = count_result.scalar()
+    
+    result = await db.execute(query.offset(skip).limit(limit))
+    categories = result.scalars().all()
+    
+    return {
+        "total": total,
+        "categories": [
+            {
+                "id": str(c.id),
+                "name": c.name,
+                "description": c.description,
+                "created_at": c.created_at.isoformat(),
+            }
+            for c in categories
+        ],
+    }
+
+
+@router.post("/categories", response_model=dict)
+async def admin_create_category(
+    data: dict,
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    name = data.get("name")
+    description = data.get("description")
+    
+    if not name:
+        raise HTTPException(status_code=400, detail="name is required")
+    
+    # Check if name already exists
+    result = await db.execute(select(Category).where(Category.name == name))
+    existing = result.scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=400, detail="Category with this name already exists")
+    
+    category = Category(name=name, description=description)
+    db.add(category)
+    await db.flush()
+    await db.commit()
+    
+    return {
+        "status": "created",
+        "id": str(category.id),
+        "name": category.name,
+        "description": category.description,
+    }
+
+
+@router.put("/categories/{category_id}", response_model=dict)
+async def admin_update_category(
+    category_id: UUID,
+    data: dict,
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Category).where(Category.id == category_id))
+    category = result.scalar_one_or_none()
+    
+    if not category:
+        raise HTTPException(status_code=404, detail="Category not found")
+    
+    name = data.get("name")
+    description = data.get("description")
+    
+    if name is not None:
+        # Check if another category has this name
+        if name != category.name:
+            result = await db.execute(
+                select(Category).where(Category.name == name, Category.id != category_id)
+            )
+            if result.scalar_one_or_none():
+                raise HTTPException(status_code=400, detail="Category with this name already exists")
+        category.name = name
+    
+    if description is not None:
+        category.description = description
+    
+    await db.flush()
+    await db.commit()
+    
+    return {
+        "status": "updated",
+        "id": str(category.id),
+        "name": category.name,
+        "description": category.description,
+    }
+
+
+@router.delete("/categories/{category_id}", response_model=dict)
+async def admin_delete_category(
+    category_id: UUID,
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Category).where(Category.id == category_id))
+    category = result.scalar_one_or_none()
+    
+    if not category:
+        raise HTTPException(status_code=404, detail="Category not found")
+    
+    # TODO: Consider what to do with articles that reference this category
+    # For now, we'll allow deletion and set category_id to NULL in articles? 
+    # But the Article model has category_id as nullable, so we can set it to NULL.
+    # However, we don't want to cascade delete articles.
+    # We'll set category_id to NULL for articles that reference this category.
+    from sqlalchemy import update
+    await db.execute(
+        update(Article)
+        .where(Article.category_id == category_id)
+        .values(category_id=None)
+    )
+    
+    await db.delete(category)
+    await db.commit()
+    
+    return {"status": "deleted", "id": str(category_id)}
+
+
+@router.get("/users", response_model=dict)
+async def admin_list_users(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    search: str | None = Query(None),
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    query = select(User).order_by(User.created_at.desc())
+    count_query = select(func.count()).select_from(User)
+    
+    if search:
+        search_term = f"%{search}%"
+        query = query.where(
+            (User.email.ilike(search_term)) |
+            (User.name.ilike(search_term))
+        )
+        count_query = count_query.where(
+            (User.email.ilike(search_term)) |
+            (User.name.ilike(search_term))
+        )
+    
+    count_result = await db.execute(count_query)
+    total = count_result.scalar()
+    
+    result = await db.execute(query.offset(skip).limit(limit))
+    users = result.scalars().all()
+    
+    return {
+        "total": total,
+        "users": [
+            {
+                "id": str(u.id),
+                "email": u.email,
+                "name": u.name,
+                "is_admin": u.is_admin,
+                "created_at": u.created_at.isoformat(),
+            }
+            for u in users
+        ],
+    }
+
+
+@router.put("/users/{user_id}/role", response_model=dict)
+async def admin_update_user_role(
+    user_id: UUID,
+    data: dict,
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    is_admin = data.get("is_admin")
+    if is_admin is None:
+        raise HTTPException(status_code=400, detail="is_admin is required")
+    
+    user.is_admin = is_admin
+    
+    await db.flush()
+    await db.commit()
+    
+    return {
+        "status": "updated",
+        "id": str(user.id),
+        "email": user.email,
+        "name": user.name,
+        "is_admin": user.is_admin,
+    }
+
+
+@router.get("/articles-without-summary", response_model=dict)
+async def list_articles_without_summary(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Article)
+        .where(Article.gk_summary.is_(None))
+        .order_by(Article.published_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    articles = result.scalars().all()
+
+    count_result = await db.execute(
+        select(func.count()).select_from(Article).where(Article.gk_summary.is_(None))
+    )
+    total = count_result.scalar()
+
+    return {
+        "total": total,
+        "articles": [
+            {
+                "id": str(a.id),
+                "source": a.source,
+                "headline": a.headline,
+                "url": a.url,
+                "published_at": a.published_at.isoformat(),
+            }
+            for a in articles
+        ],
+    }
+
+
+@router.post("/generate-summaries", response_model=dict)
+async def generate_summaries(
+    data: dict,
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    article_ids = data.get("article_ids", [])
+    if not article_ids:
+        raise HTTPException(status_code=400, detail="article_ids is required")
+
+    from app.ai.orchestrator import AIOrchestrator
+
+    uuids = [UUID(id) for id in article_ids]
+    result = await db.execute(select(Article).where(Article.id.in_(uuids)))
+    articles = result.scalars().all()
+
+    orchestrator = AIOrchestrator()
+    updated = 0
+    errors = []
+
+    for article in articles:
+        try:
+            summary = await orchestrator.summarize_article(
+                article_body=article.body_text,
+                article_id=article.id,
+                db=db,
+            )
+            article.gk_summary = summary.get("gk_gist")
+            article.syllabus_tag = summary.get("syllabus_topic")
+            article.key_terms = summary.get("key_terms")
+            updated += 1
+        except Exception as e:
+            errors.append(f"{article.id}: {e}")
+
+    await db.commit()
+
+    return {"updated": updated, "errors": errors}
 
 
 @router.get("/interactions", response_model=list[dict])
@@ -28,8 +472,11 @@ async def list_interactions(
             "id": str(i.id),
             "persona": i.persona,
             "model_used": i.model_used,
+            "prompt": i.prompt_text,
+            "response": i.response_text,
             "tokens_used": i.tokens_used,
             "latency_ms": i.latency_ms,
+            "user_feedback": i.user_feedback,
             "user_id": str(i.user_id) if i.user_id else None,
             "created_at": i.created_at.isoformat(),
         }
@@ -59,12 +506,40 @@ async def update_interaction(
     return {"status": "updated", "id": str(interaction_id)}
 
 
-@router.post("/datasets", response_model=dict)
-async def create_dataset(
-    persona: str = Query(...),
+@router.get("/datasets", response_model=dict)
+async def list_datasets(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     admin: User = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
+    datasets = await training_service.list_datasets(db=db, skip=skip, limit=limit)
+    return {
+        "datasets": [
+            {
+                "id": str(d.id),
+                "name": d.persona,
+                "persona": d.persona,
+                "num_examples": d.record_count,
+                "status": "ready",
+                "lora_adapter_path": None,
+                "created_at": d.created_at.isoformat(),
+            }
+            for d in datasets
+        ]
+    }
+
+
+@router.post("/datasets", response_model=dict)
+async def create_dataset(
+    data: dict,
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    persona = data.get("persona")
+    if not persona:
+        raise HTTPException(status_code=400, detail="persona is required")
+
     from app.ai.training.dataset_builder import build_dataset
 
     dataset_jsonl = await build_dataset(db=db, persona=persona)
@@ -81,7 +556,7 @@ async def create_dataset(
         "status": "created",
         "id": str(dataset.id),
         "persona": dataset.persona,
-        "record_count": dataset.record_count,
+        "num_examples": dataset.record_count,
     }
 
 
@@ -96,9 +571,10 @@ async def update_model(
     admin: User = Depends(get_admin_user),
 ):
     persona = data.get("persona")
-    model_name = data.get("model_name")
+    model_name = data.get("model_name") or data.get("active_model_id")
+
     if not persona or not model_name:
-        raise HTTPException(status_code=400, detail="persona and model_name required")
+        raise HTTPException(status_code=400, detail="persona and model_name (or active_model_id) required")
 
     success = registry.set_active_model(persona, model_name)
     if not success:

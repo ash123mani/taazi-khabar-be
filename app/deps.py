@@ -38,7 +38,7 @@ async def get_current_user(
 ) -> User:
     token = credentials.credentials
     try:
-        payload = jwt.decode(token, settings.nextauth_secret, algorithms=["HS256"])
+        payload = jwt.decode(token, settings.nextauth_secret.get_secret_value(), algorithms=["HS256"])
         user_id = payload.get("sub")
         if user_id is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")

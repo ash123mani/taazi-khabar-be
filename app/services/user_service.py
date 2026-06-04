@@ -24,7 +24,7 @@ def _create_token(user_id: UUID) -> str:
         "exp": datetime.now(timezone.utc) + timedelta(days=7),
         "iat": datetime.now(timezone.utc),
     }
-    return jwt.encode(payload, settings.nextauth_secret, algorithm="HS256")
+    return jwt.encode(payload, settings.nextauth_secret.get_secret_value(), algorithm="HS256")
 
 
 async def create_user(db: AsyncSession, email: str, password: str, name: str | None = None) -> User:

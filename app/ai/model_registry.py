@@ -6,11 +6,23 @@ from app.config import settings
 
 
 class ModelConfig:
-    def __init__(self, name: str, provider: str, max_tokens: int, temperature: float) -> None:
+    def __init__(
+        self,
+        name: str,
+        provider: str,
+        max_tokens: int,
+        temperature: float,
+        top_p: float = 1.0,
+        frequency_penalty: float = 0.0,
+        presence_penalty: float = 0.0,
+    ) -> None:
         self.name = name
         self.provider = provider
         self.max_tokens = max_tokens
         self.temperature = temperature
+        self.top_p = top_p
+        self.frequency_penalty = frequency_penalty
+        self.presence_penalty = presence_penalty
 
 
 class ModelRegistry:
@@ -36,6 +48,9 @@ class ModelRegistry:
                     provider=candidate["provider"],
                     max_tokens=candidate.get("max_tokens", 512),
                     temperature=candidate.get("temperature", 0.3),
+                    top_p=candidate.get("top_p", 1.0),
+                    frequency_penalty=candidate.get("frequency_penalty", 0.0),
+                    presence_penalty=candidate.get("presence_penalty", 0.0),
                 )
         return None
 

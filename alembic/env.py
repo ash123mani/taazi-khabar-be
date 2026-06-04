@@ -1,3 +1,5 @@
+"""Alembic migrations environment."""
+
 import asyncio
 from logging.config import fileConfig
 
@@ -6,7 +8,10 @@ from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.models.base import Base
-from app.models import *  # noqa: F401, F403
+
+# Import all models so Base.metadata is fully populated
+import app.models  # noqa: F401
+
 from app.config import settings
 
 config = context.config
@@ -17,9 +22,8 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    url = settings.database_url
     context.configure(
-        url=url,
+        url=settings.database_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},

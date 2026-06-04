@@ -18,6 +18,7 @@ class AIInteraction(Base):
     response_text: str = Column(Text, nullable=False)
     tokens_used: int = Column(Integer, nullable=True)
     latency_ms: float = Column(Float, nullable=True)
+    user_feedback: int = Column(Integer, nullable=True)
     user_id: UUID = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     article_id: UUID = Column(PG_UUID(as_uuid=True), ForeignKey("articles.id"), nullable=True)
     created_at: datetime = Column(DateTime(timezone=True), server_default=func.now())

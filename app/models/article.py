@@ -3,7 +3,6 @@ from datetime import datetime
 
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from pgvector.sqlalchemy import Vector
 from sqlalchemy.sql import func
 
 from app.models.base import Base
@@ -23,4 +22,3 @@ class Article(Base):
     key_terms: list = Column(ARRAY(Text), nullable=True)
     syllabus_tag: str = Column(String(200), nullable=True)
     category_id: UUID = Column(PG_UUID(as_uuid=True), ForeignKey("categories.id"), nullable=True)
-    embedding: list = Column(Vector(768), nullable=True)

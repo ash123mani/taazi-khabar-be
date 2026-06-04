@@ -9,7 +9,7 @@ from app.scrapers.base import BaseScraper
 class TheHinduScraper(BaseScraper):
     def __init__(self) -> None:
         super().__init__(
-            rss_url="https://www.thehindu.com/news/national/feed.rss",
+            rss_url="https://www.thehindu.com/news/national/?service=rss",
             rate_limit_delay=1.0,
         )
 

@@ -1,10 +1,78 @@
+from datetime import datetime
+from email.utils import parsedate_to_datetime
 from uuid import UUID
-from typing import List
+from typing import List, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.article import Article
+from app.scrapers.base import ScrapedArticle
+
+
+def _parse_rss_date(date_str: str) -> datetime:
+    try:
+        return parsedate_to_datetime(date_str)
+    except (ValueError, TypeError):
+        return datetime.now()
+
+
+async def bulk_upsert_articles(
+    db: AsyncSession,
+    articles: List[ScrapedArticle],
+    summarizer=None,
+    article_filter=None,
+) -> Tuple[int, int, List[str]]:
+    urls = [a.url for a in articles]
+    existing = await db.execute(select(Article.url).where(Article.url.in_(urls)))
+    existing_urls = {row[0] for row in existing.fetchall()}
+
+    created = 0
+    skipped = 0
+    filtered_out = 0
+    errors: List[str] = []
+
+    for article in articles:
+        if article.url in existing_urls:
+            skipped += 1
+            continue
+
+        if article_filter:
+            try:
+                is_relevant = await article_filter(headline=article.headline, body_text=article.body_text)
+                if not is_relevant:
+                    filtered_out += 1
+                    existing_urls.add(article.url)
+                    continue
+            except Exception as e:
+                errors.append(f"Filter failed for {article.url}: {e}")
+                existing_urls.add(article.url)
+                continue
+
+        db_article = Article(
+            source=article.source,
+            headline=article.headline,
+            body_text=article.body_text,
+            url=article.url,
+            published_at=_parse_rss_date(article.published_at),
+        )
+        db.add(db_article)
+        await db.flush()
+
+        if summarizer:
+            try:
+                summary = await summarizer(article.body_text, article_id=db_article.id, db=db)
+                db_article.gk_summary = summary.get("gk_gist")
+                db_article.syllabus_tag = summary.get("syllabus_topic")
+                db_article.key_terms = summary.get("key_terms")
+            except Exception as e:
+                errors.append(f"Summarization failed for {article.url}: {e}")
+
+        existing_urls.add(article.url)
+        created += 1
+
+    await db.commit()
+    return created, skipped, errors, filtered_out
 
 
 async def list_articles(

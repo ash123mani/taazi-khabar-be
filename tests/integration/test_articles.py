@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from uuid import uuid4
+from datetime import datetime, timezone
 
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,7 +19,7 @@ async def seed_articles(db: AsyncSession, count: int = 5, source: str = "the_hin
             headline=f"Test Article {i + 1}",
             body_text=f"Body of article {i + 1}." * 20,
             url=f"https://example.com/article-{source}-{i + 1}",
-            published_at=f"2026-06-0{i + 1}T00:00:00+00:00",
+            published_at=datetime(2026, 6, i + 1, tzinfo=timezone.utc),
             gk_summary=f"Summary {i + 1}" if i % 2 == 0 else None,
             key_terms=[f"term{i + 1}a", f"term{i + 1}b"] if i % 2 == 0 else None,
             syllabus_tag=f"Topic {i + 1}" if i % 2 == 0 else None,

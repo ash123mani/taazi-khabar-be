@@ -1,8 +1,6 @@
 """Seed script to populate exam_questions table with sample UPSC questions."""
 import asyncio
-import json
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 from app.config import settings
 from app.models.exam_question import ExamQuestion
@@ -88,7 +86,7 @@ SAMPLE_QUESTIONS = [
 
 async def seed() -> None:
     engine = create_async_engine(settings.database_url)
-    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
 
     async with async_session() as session:
         for q_data in SAMPLE_QUESTIONS:

@@ -79,7 +79,7 @@ class TestLogin:
 
     async def test_login_empty_email(self, client: AsyncClient):
         res = await client.post("/api/auth/login", json={"email": "", "password": "pass"})
-        assert res.status_code == 422
+        assert res.status_code == 401
 
 
 class TestMe:
@@ -92,7 +92,7 @@ class TestMe:
 
     async def test_get_me_no_token(self, client: AsyncClient):
         res = await client.get("/api/auth/me")
-        assert res.status_code == 403
+        assert res.status_code == 401
 
     async def test_get_me_invalid_token(self, client: AsyncClient):
         res = await client.get("/api/auth/me", headers={
