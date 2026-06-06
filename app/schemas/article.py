@@ -16,6 +16,7 @@ class ArticleResponse(BaseModel):
     gk_summary: str | None
     key_terms: List[str] | None
     syllabus_tag: str | None
+    image_url: str | None
     category_id: UUID | None
 
     class Config:

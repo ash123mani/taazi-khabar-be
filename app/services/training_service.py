@@ -8,6 +8,10 @@ from app.models.training_dataset import TrainingDataset
 from app.models.ai_interaction import AIInteraction
 
 
+async def get_dataset_by_id(db: AsyncSession, dataset_id: UUID) -> TrainingDataset | None:
+    return await db.get(TrainingDataset, dataset_id)
+
+
 async def list_datasets(db: AsyncSession, skip: int = 0, limit: int = 20) -> List[TrainingDataset]:
     result = await db.execute(
         select(TrainingDataset).order_by(desc(TrainingDataset.created_at)).offset(skip).limit(limit)

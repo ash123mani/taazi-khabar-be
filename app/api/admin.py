@@ -1,13 +1,16 @@
+import io
 from datetime import date, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func, cast, Date
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import get_db, get_admin_user
 from app.models.user import User
 from app.models.article import Article
+from app.models.category import Category
 from app.models.ai_interaction import AIInteraction
 from app.ai.model_registry import registry
 from app.services import training_service
@@ -33,7 +36,7 @@ async def list_scrape_dates(
     today = date.today()
     date_range = [(today - timedelta(days=i)).isoformat() for i in range(days)]
 
-    sources = ["the_hindu", "indian_express"]
+    sources = ["thehindu", "indianexpress"]
     dates_dto = {}
     for source in sources:
         dates_dto[source] = [
@@ -42,6 +45,65 @@ async def list_scrape_dates(
         ]
 
     return {"dates": dates_dto}
+
+
+@router.get("/scrape-summary", response_model=dict)
+async def scrape_summary(
+    days: int = Query(30, ge=1, le=90),
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    since = date.today() - timedelta(days=days)
+    rows = await db.execute(
+        select(
+            Article.source,
+            cast(Article.published_at, Date).label("pub_date"),
+            func.count(Article.id).label("total"),
+            func.array_agg(func.distinct(func.date_trunc("minute", Article.scraped_at))).label("scrape_times"),
+            Article.syllabus_tag,
+        )
+        .where(cast(Article.published_at, Date) >= since)
+        .group_by(Article.source, cast(Article.published_at, Date), Article.syllabus_tag)
+        .order_by(Article.source, cast(Article.published_at, Date).desc())
+    )
+    rows_all = rows.all()
+
+    sources: dict[str, dict] = {}
+    for source, pub_date, total, scrape_times, syllabus_tag in rows_all:
+        ds = pub_date.isoformat()
+        src = sources.setdefault(source, {})
+        day = src.setdefault(ds, {"date": ds, "total_articles": 0, "scrape_times": set(), "categories": {}})
+        day["total_articles"] += total
+        if scrape_times:
+            for t in scrape_times:
+                if t:
+                    day["scrape_times"].add(t.isoformat())
+        if syllabus_tag:
+            cat = syllabus_tag.split(":")[0].strip() if ":" in syllabus_tag else syllabus_tag
+            day["categories"][cat] = day["categories"].get(cat, 0) + total
+
+    all_sources = set(sources.keys()) | {"thehindu", "indianexpress"}
+    today = date.today()
+    date_range = [(today - timedelta(days=i)).isoformat() for i in range(days)]
+
+    result = {}
+    for source in sorted(all_sources):
+        days_data = sources.get(source, {})
+        result[source] = []
+        for d in reversed(date_range):
+            if d in days_data:
+                day = days_data[d]
+                day["scrape_times"] = sorted(day["scrape_times"])
+                result[source].append(day)
+            else:
+                result[source].append({
+                    "date": d,
+                    "total_articles": 0,
+                    "scrape_times": [],
+                    "categories": {},
+                })
+
+    return {"sources": result}
 
 
 @router.post("/scrape-date", response_model=dict)
@@ -53,8 +115,8 @@ async def scrape_date(
     source = data.get("source")
     target_date = data.get("date")
 
-    if source not in ("the_hindu", "indian_express"):
-        raise HTTPException(status_code=400, detail="source must be the_hindu or indian_express")
+    if source not in ("thehindu", "indianexpress"):
+        raise HTTPException(status_code=400, detail="source must be thehindu or indianexpress")
     if not target_date:
         raise HTTPException(status_code=400, detail="date is required (YYYY-MM-DD)")
 
@@ -95,6 +157,45 @@ async def scrape_date(
         "articles_skipped": skipped,
         "articles_filtered_out": filtered_out,
         "errors": summary_errors,
+    }
+
+
+@router.get("/scrape-articles", response_model=dict)
+async def scrape_articles(
+    source: str = Query(...),
+    date_str: str = Query(alias="date"),
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        parsed = date.fromisoformat(date_str)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format, use YYYY-MM-DD")
+    result = await db.execute(
+        select(Article)
+        .where(
+            Article.source == source,
+            cast(Article.published_at, Date) == parsed,
+        )
+        .order_by(Article.published_at.desc())
+    )
+    articles = result.scalars().all()
+    return {
+        "articles": [
+            {
+                "id": str(a.id),
+                "source": a.source,
+                "headline": a.headline,
+                "url": a.url,
+                "published_at": a.published_at.isoformat(),
+                "gk_summary": a.gk_summary,
+                "key_terms": a.key_terms,
+                "syllabus_tag": a.syllabus_tag,
+                "image_url": a.image_url,
+                "scraped_at": a.scraped_at.isoformat() if a.scraped_at else None,
+            }
+            for a in articles
+        ]
     }
 
 
@@ -145,6 +246,7 @@ async def admin_list_articles(
                 "gk_summary": a.gk_summary,
                 "key_terms": a.key_terms,
                 "syllabus_tag": a.syllabus_tag,
+                "image_url": a.image_url,
                 "scraped_at": a.scraped_at.isoformat() if a.scraped_at else None,
             }
             for a in articles
@@ -492,7 +594,7 @@ async def update_interaction(
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        AIInteraction.__table__.select().where(AIInteraction.id == interaction_id)
+        select(AIInteraction).where(AIInteraction.id == interaction_id)
     )
     interaction = result.scalar_one_or_none()
     if interaction is None:
@@ -503,6 +605,7 @@ async def update_interaction(
             setattr(interaction, key, value)
 
     await db.flush()
+    await db.refresh(interaction)
     return {"status": "updated", "id": str(interaction_id)}
 
 
@@ -560,15 +663,47 @@ async def create_dataset(
     }
 
 
+@router.get("/datasets/{dataset_id}/download")
+async def download_dataset(
+    dataset_id: UUID,
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    dataset = await training_service.get_dataset_by_id(db=db, dataset_id=dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    stream = io.StringIO(dataset.dataset_jsonl)
+    filename = f"{dataset.persona}-dataset-{dataset.created_at.strftime('%Y%m%d')}.jsonl"
+    return StreamingResponse(
+        iter([stream.read()]),
+        media_type="application/jsonl",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/models", response_model=dict)
-async def list_models(admin: User = Depends(get_admin_user)):
-    return registry.list_models()
+async def list_models(
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    models = await registry.db_list_models(db=db)
+    grouped: dict[str, list[dict]] = {}
+    for m in models:
+        persona = m["persona"]
+        grouped.setdefault(persona, []).append({
+            "id": m["id"],
+            "name": m["model_name"],
+            "provider": m["provider"],
+            "active": m["is_active"],
+        })
+    return grouped
 
 
 @router.put("/models", response_model=dict)
 async def update_model(
     data: dict,
     admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
 ):
     persona = data.get("persona")
     model_name = data.get("model_name") or data.get("active_model_id")
@@ -576,7 +711,7 @@ async def update_model(
     if not persona or not model_name:
         raise HTTPException(status_code=400, detail="persona and model_name (or active_model_id) required")
 
-    success = registry.set_active_model(persona, model_name)
+    success = await registry.db_set_active_model(db=db, persona=persona, model_name=model_name)
     if not success:
         raise HTTPException(status_code=404, detail="Model not found for persona")
     return {"status": "updated", "persona": persona, "active_model": model_name}

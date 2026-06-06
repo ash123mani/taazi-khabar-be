@@ -53,9 +53,9 @@ async def main():
 
             db2 = session_factory()
             article = await db2.get(Article, article_id)
-            article.gk_summary = parsed.get("gk_summary", response.text[:500])
+            article.gk_summary = parsed.get("gk_gist", response.text[:500])
             article.key_terms = parsed.get("key_terms", [])
-            article.syllabus_tag = parsed.get("syllabus_tag")
+            article.syllabus_tag = parsed.get("syllabus_topic")
             interaction = AIInteraction(
                 persona="summarizer",
                 model_used=model_config.name,

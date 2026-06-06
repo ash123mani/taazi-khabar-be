@@ -13,6 +13,7 @@ class ScrapedArticle:
     body_text: str
     url: str
     published_at: str
+    image_url: str | None = None
 
 
 class BaseScraper(ABC):
@@ -31,11 +32,23 @@ class BaseScraper(ABC):
         feed = await loop.run_in_executor(None, feedparser.parse, response.text)
         entries = []
         for entry in feed.entries:
+            image_url = None
+            if hasattr(entry, "media_content") and entry.media_content:
+                for media in entry.media_content:
+                    if media.get("type", "").startswith("image"):
+                        image_url = media.get("url")
+                        break
+            if not image_url and hasattr(entry, "enclosures"):
+                for enc in entry.enclosures:
+                    if enc.get("type", "").startswith("image"):
+                        image_url = enc.get("href") or enc.get("url")
+                        break
             entries.append({
                 "title": entry.get("title", ""),
                 "link": entry.get("link", ""),
                 "published": entry.get("published", ""),
                 "summary": entry.get("summary", ""),
+                "image_url": image_url,
             })
         return entries
 
@@ -62,6 +75,7 @@ class BaseScraper(ABC):
                             body_text=body,
                             url=entry["link"],
                             published_at=entry["published"],
+                            image_url=entry.get("image_url"),
                         )
                     )
 

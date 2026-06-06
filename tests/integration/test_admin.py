@@ -108,7 +108,8 @@ class TestAdminDatasets:
     async def test_create_dataset(self, client: AsyncClient, db_session: AsyncSession, admin_token: dict):
         await seed_interaction(db_session)
         res = await client.post(
-            "/api/admin/datasets?persona=summarizer",
+            "/api/admin/datasets",
+            json={"persona": "summarizer"},
             headers=auth_header(admin_token["token"]),
         )
         assert res.status_code == 200, res.text
@@ -119,7 +120,8 @@ class TestAdminDatasets:
 
     async def test_create_dataset_no_interactions(self, client: AsyncClient, admin_token: dict):
         res = await client.post(
-            "/api/admin/datasets?persona=summarizer",
+            "/api/admin/datasets",
+            json={"persona": "summarizer"},
             headers=auth_header(admin_token["token"]),
         )
         assert res.status_code == 200
@@ -130,7 +132,7 @@ class TestAdminDatasets:
             "/api/admin/datasets",
             headers=auth_header(admin_token["token"]),
         )
-        assert res.status_code == 422
+        assert res.status_code == 400
 
     async def test_create_dataset_no_auth(self, client: AsyncClient):
         res = await client.post("/api/admin/datasets?persona=summarizer")
@@ -169,15 +171,12 @@ class TestAdminModels:
         assert res.status_code == 403
 
     async def test_update_model_raises_not_implemented(self, client: AsyncClient, admin_token: dict):
-        try:
-            res = await client.put(
-                "/api/admin/models",
-                json={"persona": "summarizer", "model_name": "meta/llama-3.1-8b-instruct"},
-                headers=auth_header(admin_token["token"]),
-            )
-            assert res.status_code == 500
-        except Exception:
-            pass
+        res = await client.put(
+            "/api/admin/models",
+            json={"persona": "summarizer", "model_name": "meta/llama-3.1-8b-instruct"},
+            headers=auth_header(admin_token["token"]),
+        )
+        assert res.status_code in (404, 500)
 
     async def test_update_model_missing_fields(self, client: AsyncClient, admin_token: dict):
         res = await client.put(

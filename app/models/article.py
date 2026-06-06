@@ -21,4 +21,5 @@ class Article(Base):
     gk_summary: str = Column(Text, nullable=True)
     key_terms: list = Column(ARRAY(Text), nullable=True)
     syllabus_tag: str = Column(String(200), nullable=True)
+    image_url: str = Column(Text, nullable=True)
     category_id: UUID = Column(PG_UUID(as_uuid=True), ForeignKey("categories.id"), nullable=True)

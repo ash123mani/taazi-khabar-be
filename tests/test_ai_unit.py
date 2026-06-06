@@ -65,12 +65,13 @@ class TestModelRegistry:
         assert models["summarizer"][0]["active"] is True
         assert models["summarizer"][1]["active"] is False
 
-    def test_set_active_model_raises_not_implemented(self, tmp_path):
+    def test_set_active_model_switches_active(self, tmp_path):
         config_file = tmp_path / "models.yaml"
         config_file.write_text(SAMPLE_MODELS_YAML)
         registry = ModelRegistry(config_path=config_file)
-        with pytest.raises(NotImplementedError):
-            registry.set_active_model("summarizer", "some-model")
+        result = registry.set_active_model("summarizer", "nvidia/llama-3.3-nemotron-super-49b-v1.5")
+        assert result is True
+        assert registry.get_active_model("summarizer").name == "nvidia/llama-3.3-nemotron-super-49b-v1.5"
 
     def test_get_active_model_no_candidates_match(self, tmp_path):
         yaml_content = """

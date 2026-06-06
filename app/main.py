@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.api.router import api_router
+from app.ai.model_registry import registry
 from app.config import settings
 
 
@@ -16,6 +17,13 @@ async def lifespan(app: FastAPI):
     )
     app.state.engine = engine
     app.state.async_session_factory = async_session_factory
+
+    async with async_session_factory() as session:
+        seeded = await registry.db_seed_from_yaml(db=session)
+        await session.commit()
+        if seeded:
+            print(f"Seeded {seeded} model registry entries from YAML")
+
     yield
     await engine.dispose()
 

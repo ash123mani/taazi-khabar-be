@@ -5,6 +5,7 @@ from app.models.quiz import Quiz, QuizArticle, QuizQuestion, QuizAnswer
 from app.models.ai_interaction import AIInteraction
 from app.models.training_dataset import TrainingDataset
 from app.models.exam_question import ExamQuestion
+from app.models.model_registry import ModelRegistryEntry
 
 __all__ = [
     "User",

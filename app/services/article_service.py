@@ -22,7 +22,7 @@ async def bulk_upsert_articles(
     articles: List[ScrapedArticle],
     summarizer=None,
     article_filter=None,
-) -> Tuple[int, int, List[str]]:
+) -> Tuple[int, int, List[str], int]:
     urls = [a.url for a in articles]
     existing = await db.execute(select(Article.url).where(Article.url.in_(urls)))
     existing_urls = {row[0] for row in existing.fetchall()}
@@ -55,6 +55,7 @@ async def bulk_upsert_articles(
             body_text=article.body_text,
             url=article.url,
             published_at=_parse_rss_date(article.published_at),
+            image_url=article.image_url,
         )
         db.add(db_article)
         await db.flush()
