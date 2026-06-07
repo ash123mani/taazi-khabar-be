@@ -1,3 +1,6 @@
+import asyncio
+import math
+import random
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -5,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import get_db, get_current_user
 from app.models.user import User
+from app.models.article import Article
 from app.schemas.quiz import (
     QuizGenerateRequest,
     QuizGenerateResponse,
@@ -39,8 +43,15 @@ async def generate_quiz(
         return QuizGenerateResponse(quiz_id=existing.id, cached=True)
 
     articles = await article_service.get_articles_by_ids(db, req.article_ids)
+    num_articles = len(articles)
+    if num_articles == 0:
+        raise HTTPException(status_code=400, detail="No articles found")
+
+    questions_per_article = max(1, math.ceil(req.num_questions / num_articles))
+
     articles_dicts = [
         {
+            "id": a.id,
             "headline": a.headline,
             "body_text": a.body_text,
             "gk_summary": a.gk_summary,
@@ -48,19 +59,55 @@ async def generate_quiz(
         for a in articles
     ]
 
-    questions_data = await orchestrator.generate_mcq(
-        articles=articles_dicts,
-        num_questions=req.num_questions,
-        user_id=user.id,
-        db=db,
-    )
+    all_questions_data: list[dict] = []
+    articles_needing_llm: list[tuple[dict, int]] = []
+
+    for a_dict in articles_dicts:
+        cached_count = await quiz_service.get_cached_question_count(db, a_dict["id"])
+        needed = questions_per_article
+        if cached_count >= needed:
+            cached = await quiz_service.get_cached_questions_for_article(
+                db, a_dict["id"], needed
+            )
+            for cq in cached:
+                all_questions_data.append({
+                    "question_text": cq.question_text,
+                    "options": cq.options,
+                    "correct_answer": cq.correct_answer,
+                    "explanation": cq.explanation,
+                    "difficulty": cq.difficulty,
+                })
+        else:
+            articles_needing_llm.append((a_dict, needed))
+
+    if articles_needing_llm:
+        async def generate_for_article(
+            article_dict: dict, n: int
+        ) -> list[dict]:
+            qs = await orchestrator.generate_mcq_for_article(
+                article=article_dict,
+                num_questions=n,
+                user_id=user.id,
+                db=db,
+            )
+            await quiz_service.cache_questions(db, article_dict["id"], qs)
+            return qs
+
+        results = await asyncio.gather(
+            *[generate_for_article(a, n) for a, n in articles_needing_llm]
+        )
+        for qs in results:
+            all_questions_data.extend(qs)
+
+    random.shuffle(all_questions_data)
+    all_questions_data = all_questions_data[:req.num_questions]
 
     quiz = await quiz_service.create_quiz(
         db=db,
         user_id=user.id,
         article_set_hash=article_set_hash,
         articles=articles,
-        questions_data=questions_data,
+        questions_data=all_questions_data,
     )
 
     return QuizGenerateResponse(quiz_id=quiz.id, cached=False)

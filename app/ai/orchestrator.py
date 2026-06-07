@@ -135,3 +135,17 @@ class AIOrchestrator:
             )
 
         return parsed
+
+    async def generate_mcq_for_article(
+        self,
+        article: dict[str, Any],
+        num_questions: int = 3,
+        user_id: UUID | None = None,
+        db: AsyncSession | None = None,
+    ) -> list[dict[str, Any]]:
+        return await self.generate_mcq(
+            articles=[article],
+            num_questions=num_questions,
+            user_id=user_id,
+            db=db,
+        )

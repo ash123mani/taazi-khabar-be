@@ -1,12 +1,14 @@
 import hashlib
+import math
 from uuid import UUID
 from typing import List
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.quiz import Quiz, QuizArticle, QuizQuestion, QuizAnswer
 from app.models.article import Article
+from app.models.cached_question import CachedQuestion
 
 
 def compute_article_set_hash(article_ids: List[UUID], num_questions: int) -> str:
@@ -20,6 +22,47 @@ async def find_existing_quiz(db: AsyncSession, article_set_hash: str) -> Quiz | 
         select(Quiz).where(Quiz.article_set_hash == article_set_hash)
     )
     return result.scalar_one_or_none()
+
+
+async def get_cached_question_count(db: AsyncSession, article_id: UUID) -> int:
+    result = await db.execute(
+        select(func.count(CachedQuestion.id))
+        .where(CachedQuestion.article_id == article_id)
+    )
+    return result.scalar() or 0
+
+
+async def get_cached_questions_for_article(
+    db: AsyncSession, article_id: UUID, limit: int
+) -> List[CachedQuestion]:
+    result = await db.execute(
+        select(CachedQuestion)
+        .where(CachedQuestion.article_id == article_id)
+        .order_by(func.random())
+        .limit(limit)
+    )
+    return list(result.scalars().all())
+
+
+async def cache_questions(
+    db: AsyncSession,
+    article_id: UUID,
+    questions_data: List[dict],
+) -> List[CachedQuestion]:
+    cached = []
+    for q_data in questions_data:
+        cq = CachedQuestion(
+            article_id=article_id,
+            question_text=q_data["question_text"],
+            options=q_data["options"],
+            correct_answer=q_data["correct_answer"],
+            explanation=q_data.get("explanation"),
+            difficulty=q_data.get("difficulty"),
+        )
+        db.add(cq)
+        cached.append(cq)
+    await db.flush()
+    return cached
 
 
 async def create_quiz(

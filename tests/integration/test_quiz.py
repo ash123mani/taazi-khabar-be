@@ -68,22 +68,20 @@ class TestGenerateQuiz:
         assert res.status_code == 401
 
     async def test_generate_empty_article_ids(self, client: AsyncClient, user_token: dict):
-        with patch("app.ai.orchestrator.AIOrchestrator.generate_mcq", return_value=[]):
-            res = await client.post(
-                "/api/quizzes/generate",
-                json={"article_ids": [], "num_questions": 5},
-                headers=auth_header(user_token["token"]),
-            )
-        assert res.status_code == 200
+        res = await client.post(
+            "/api/quizzes/generate",
+            json={"article_ids": [], "num_questions": 5},
+            headers=auth_header(user_token["token"]),
+        )
+        assert res.status_code == 422
 
     async def test_generate_invalid_article_ids(self, client: AsyncClient, user_token: dict):
-        with patch("app.ai.orchestrator.AIOrchestrator.generate_mcq", return_value=[]):
-            res = await client.post(
-                "/api/quizzes/generate",
-                json={"article_ids": [str(uuid4())], "num_questions": 5},
-                headers=auth_header(user_token["token"]),
-            )
-        assert res.status_code == 200
+        res = await client.post(
+            "/api/quizzes/generate",
+            json={"article_ids": [str(uuid4())], "num_questions": 5},
+            headers=auth_header(user_token["token"]),
+        )
+        assert res.status_code == 400
 
     async def test_generate_invalid_uuid(self, client: AsyncClient, user_token: dict):
         res = await client.post(
@@ -95,22 +93,21 @@ class TestGenerateQuiz:
 
     async def test_generate_num_questions_zero(self, client: AsyncClient, db_session: AsyncSession, user_token: dict):
         article = await seed_article(db_session)
-        with patch("app.ai.orchestrator.AIOrchestrator.generate_mcq", return_value=[]):
+        with patch("app.ai.orchestrator.AIOrchestrator.generate_mcq_for_article", return_value=[]):
             res = await client.post(
                 "/api/quizzes/generate",
                 json={"article_ids": [str(article.id)], "num_questions": 0},
                 headers=auth_header(user_token["token"]),
             )
-        assert res.status_code == 200
+        assert res.status_code == 422
 
     async def test_generate_negative_num_questions(self, client: AsyncClient, user_token: dict):
-        with patch("app.ai.orchestrator.AIOrchestrator.generate_mcq", return_value=[]):
-            res = await client.post(
-                "/api/quizzes/generate",
-                json={"article_ids": [str(uuid4())], "num_questions": -1},
-                headers=auth_header(user_token["token"]),
-            )
-        assert res.status_code == 200
+        res = await client.post(
+            "/api/quizzes/generate",
+            json={"article_ids": [str(uuid4())], "num_questions": -1},
+            headers=auth_header(user_token["token"]),
+        )
+        assert res.status_code == 422
 
 
 class TestQuizCaching:
