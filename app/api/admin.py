@@ -125,7 +125,7 @@ async def scrape_date(
     from app.services.article_service import bulk_upsert_articles
     from app.ai.orchestrator import AIOrchestrator
 
-    scraper = TheHinduScraper() if source == "the_hindu" else IndianExpressScraper()
+    scraper = TheHinduScraper() if source == "thehindu" else IndianExpressScraper()
 
     try:
         articles = await scraper.scrape()

@@ -17,7 +17,7 @@ class NIMProvider(BaseProvider):
     async def _get_client(self, base_url: str = "") -> httpx.AsyncClient:
         url = base_url or self.base_url
         if self._client is None or url != self._current_base_url:
-            self._client = httpx.AsyncClient(base_url=url, timeout=60.0)
+            self._client = httpx.AsyncClient(base_url=url, timeout=300.0)
             self._current_base_url = url
         return self._client
 

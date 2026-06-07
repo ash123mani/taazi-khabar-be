@@ -1,9 +1,13 @@
 from uuid import UUID
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, or_
 
 from app.deps import get_db
+from app.models.article import Article
+from app.models.bookmark import Bookmark
 from app.schemas.article import ArticleResponse, ArticleListResponse
 from app.services import article_service
 
@@ -16,13 +20,42 @@ async def list_articles(
     limit: int = Query(20, ge=1, le=100),
     source: str | None = Query(None),
     category_id: UUID | None = Query(None),
+    date_str: str | None = Query(None, alias="date"),
+    search: str | None = Query(None),
+    user_id: UUID | None = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
+    article_date: date | None = None
+    if date_str:
+        try:
+            article_date = date.fromisoformat(date_str)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format, use YYYY-MM-DD")
+
     articles, total = await article_service.list_articles(
-        db=db, skip=skip, limit=limit, source=source, category_id=category_id
+        db=db, skip=skip, limit=limit, source=source,
+        category_id=category_id, article_date=article_date,
+        search=search,
     )
+
+    quizzed_ids = await article_service.get_quizzed_article_ids(db, article_date)
+
+    bookmarked_ids: set[UUID] = set()
+    if user_id:
+        bm_result = await db.execute(
+            select(Bookmark.article_id).where(Bookmark.user_id == user_id)
+        )
+        bookmarked_ids = {row[0] for row in bm_result.fetchall()}
+
+    article_responses = []
+    for a in articles:
+        resp = ArticleResponse.model_validate(a)
+        resp.has_quiz = a.id in quizzed_ids
+        resp.is_bookmarked = a.id in bookmarked_ids
+        article_responses.append(resp)
+
     return ArticleListResponse(
-        articles=[ArticleResponse.model_validate(a) for a in articles],
+        articles=article_responses,
         total=total,
     )
 

@@ -1,12 +1,14 @@
-from datetime import datetime
+from datetime import date, datetime
 from email.utils import parsedate_to_datetime
 from uuid import UUID
 from typing import List, Tuple
 
-from sqlalchemy import select
+from sqlalchemy import select, cast, Date, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from app.models.article import Article
+from app.models.quiz import QuizArticle
 from app.scrapers.base import ScrapedArticle
 
 
@@ -82,6 +84,8 @@ async def list_articles(
     limit: int = 20,
     source: str | None = None,
     category_id: UUID | None = None,
+    article_date: date | None = None,
+    search: str | None = None,
 ) -> tuple[List[Article], int]:
     query = select(Article).order_by(Article.published_at.desc())
     count_query = select(Article)
@@ -92,6 +96,17 @@ async def list_articles(
     if category_id:
         query = query.where(Article.category_id == category_id)
         count_query = count_query.where(Article.category_id == category_id)
+    if article_date:
+        query = query.where(cast(Article.published_at, Date) == article_date)
+        count_query = count_query.where(cast(Article.published_at, Date) == article_date)
+    if search:
+        search_filter = or_(
+            Article.headline.ilike(f"%{search}%"),
+            Article.gk_summary.ilike(f"%{search}%"),
+            Article.syllabus_tag.ilike(f"%{search}%"),
+        )
+        query = query.where(search_filter)
+        count_query = count_query.where(search_filter)
 
     count_result = await db.execute(count_query)
     total = len(count_result.scalars().all())
@@ -101,6 +116,14 @@ async def list_articles(
     articles = list(result.scalars().all())
 
     return articles, total
+
+
+async def get_quizzed_article_ids(db: AsyncSession, article_date: date | None = None) -> set[UUID]:
+    query = select(QuizArticle.article_id).distinct()
+    if article_date:
+        query = query.where(cast(Article.published_at, Date) == article_date)
+    result = await db.execute(query)
+    return {row[0] for row in result.fetchall()}
 
 
 async def get_article_by_id(db: AsyncSession, article_id: UUID) -> Article | None:

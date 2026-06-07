@@ -1,4 +1,5 @@
 import asyncio
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -43,10 +44,15 @@ class BaseScraper(ABC):
                     if enc.get("type", "").startswith("image"):
                         image_url = enc.get("href") or enc.get("url")
                         break
+            pub_struct = entry.get("published_parsed")
+            if pub_struct:
+                published_iso = time.strftime("%Y-%m-%dT%H:%M:%S", pub_struct) + "+0000"
+            else:
+                published_iso = entry.get("published", "")
             entries.append({
                 "title": entry.get("title", ""),
                 "link": entry.get("link", ""),
-                "published": entry.get("published", ""),
+                "published": published_iso,
                 "summary": entry.get("summary", ""),
                 "image_url": image_url,
             })

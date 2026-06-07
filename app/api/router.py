@@ -17,3 +17,9 @@ api_router.include_router(history_router, prefix="/history", tags=["history"])
 api_router.include_router(admin_router, prefix="/admin", tags=["admin"])
 api_router.include_router(scraping_router, prefix="/scraping", tags=["scraping"])
 api_router.include_router(categories_router, prefix="/categories", tags=["categories"])
+
+from app.api.bookmarks import router as bookmarks_router
+api_router.include_router(bookmarks_router, prefix="/bookmarks", tags=["bookmarks"])
+
+from app.api.analytics import router as analytics_router
+api_router.include_router(analytics_router, prefix="/analytics", tags=["analytics"])

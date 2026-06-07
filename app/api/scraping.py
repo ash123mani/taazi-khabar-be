@@ -13,14 +13,14 @@ router = APIRouter()
 
 @router.post("/scrape")
 async def scrape_articles(
-    source: str = Query("all", pattern="^(all|the_hindu|indian_express)$"),
+    source: str = Query("all", pattern="^(all|thehindu|indianexpress)$"),
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(get_admin_user),
 ):
     scrapers = []
-    if source in ("all", "the_hindu"):
+    if source in ("all", "thehindu"):
         scrapers.append(TheHinduScraper())
-    if source in ("all", "indian_express"):
+    if source in ("all", "indianexpress"):
         scrapers.append(IndianExpressScraper())
 
     all_articles = []

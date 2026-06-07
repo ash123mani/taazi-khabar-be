@@ -100,40 +100,61 @@ class TestSummarizerPersona:
         system, prompt = summarizer_build_prompt("Test article body")
         assert "UPSC" in system
         assert "Test article body" in prompt
-        assert "GK Gist" in prompt
+        assert "GK Summary" in prompt
 
     def test_build_prompt_empty_body(self):
         system, prompt = summarizer_build_prompt("")
         assert prompt
 
     def test_parse_response_full(self):
-        response = """- GK Gist: Key point one.
-- Key point two.
-- Syllabus Topic: GS Paper 2 - Polity
-- Key Terms: term1, term2, term3"""
+        response = """### GK Summary
+Two concise sentences about the article.
+
+### GK Pointers for UPSC
+• **Key Point 1** — Detail about the point
+• **Key Point 2** — Detail about the point
+
+### Syllabus Tag
+GS Paper 2 — Polity: Constitutional Bodies
+
+### Key Terms
+term1, term2, term3"""
         parsed = summarizer_parse_response(response)
-        assert "Key point one" in parsed["gk_gist"]
+        assert "GK Summary" in parsed["gk_gist"]
+        assert "GK Pointers" in parsed["gk_gist"]
+        assert "Key Point 1" in parsed["gk_gist"]
         assert "GS Paper 2" in parsed["syllabus_topic"]
         assert parsed["key_terms"] == ["term1", "term2", "term3"]
 
     def test_parse_response_minimal(self):
-        response = """GK Gist: Just one point.
-Syllabus Topic: GS 3
-Key Terms: term1"""
+        response = """### GK Summary
+Just one point.
+
+### Syllabus Tag
+GS 3 — Economy
+
+### Key Terms
+term1"""
         parsed = summarizer_parse_response(response)
         assert parsed["gk_gist"]
-        assert parsed["syllabus_topic"] == "GS 3"
+        assert "GS 3" in parsed["syllabus_topic"]
         assert parsed["key_terms"] == ["term1"]
 
     def test_parse_response_no_key_terms(self):
-        response = """- GK Gist: Point A
-- Syllabus Topic: Topic X
-- Key Terms:"""
+        response = """### GK Summary
+Point A
+
+### Syllabus Tag
+Topic X
+
+### Key Terms
+"""
         parsed = summarizer_parse_response(response)
         assert parsed["key_terms"] == []
 
     def test_parse_response_no_syllabus(self):
-        response = """- GK Gist: Point A"""
+        response = """### GK Summary
+Point A"""
         parsed = summarizer_parse_response(response)
         assert parsed["syllabus_topic"] == ""
 
@@ -145,12 +166,15 @@ Key Terms: term1"""
         assert parsed["key_terms"] == []
 
     def test_parse_response_case_insensitive_headers(self):
-        response = """gk gist: Lowercase point.
-syllabus topic: GS 1
-key terms: a, b"""
+        response = """### gk summary
+Lowercase point.
+### syllabus tag
+gs 1
+### key terms
+a, b"""
         parsed = summarizer_parse_response(response)
         assert "Lowercase" in parsed["gk_gist"]
-        assert parsed["syllabus_topic"] == "GS 1"
+        assert "gs 1" in parsed["syllabus_topic"]
 
 
 class TestQuestionSetterPersona:

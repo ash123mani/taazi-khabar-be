@@ -6,6 +6,7 @@ from app.models.ai_interaction import AIInteraction
 from app.models.training_dataset import TrainingDataset
 from app.models.exam_question import ExamQuestion
 from app.models.model_registry import ModelRegistryEntry
+from app.models.bookmark import Bookmark
 
 __all__ = [
     "User",
@@ -18,4 +19,6 @@ __all__ = [
     "AIInteraction",
     "TrainingDataset",
     "ExamQuestion",
+    "ModelRegistryEntry",
+    "Bookmark",
 ]

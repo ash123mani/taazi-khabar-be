@@ -18,6 +18,8 @@ class ArticleResponse(BaseModel):
     syllabus_tag: str | None
     image_url: str | None
     category_id: UUID | None
+    has_quiz: bool = False
+    is_bookmarked: bool = False
 
     class Config:
         from_attributes = True

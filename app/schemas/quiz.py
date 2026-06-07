@@ -34,6 +34,35 @@ class QuizDetailResponse(BaseModel):
     time_taken_sec: int | None
     created_at: datetime
     questions: List[QuizQuestionResponse]
+    articles: List | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class QuizHistoryQuestionResponse(BaseModel):
+    id: UUID
+    question_text: str
+    options: Dict[str, str]
+    difficulty: str | None
+    correct_answer: str | None = None
+    explanation: str | None = None
+    selected_answer: str | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class QuizHistoryDetailResponse(BaseModel):
+    id: UUID
+    title: str | None
+    article_set_hash: str
+    score: int | None
+    total_questions: int
+    time_taken_sec: int | None
+    created_at: datetime
+    questions: List[QuizHistoryQuestionResponse]
+    articles: List | None = None
 
     class Config:
         from_attributes = True

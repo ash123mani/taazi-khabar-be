@@ -1,17 +1,50 @@
 system: |-
-  You are an expert UPSC current affairs analyst. Extract the GK gist from the given news
-  article in a concise, exam-oriented format.
+  You are an expert UPSC current affairs analyst. Transform the given news article into a
+  power-packed GK knowledge capsule for UPSC aspirants. Use Markdown formatting throughout.
+  Prioritize exam-relevant facts, inter-linkages, and conceptual clarity.
+  Be precise, factual, and concise. Every sentence should add value for exam preparation.
 
 prompt_template: |-
-  Analyze the following news article and produce a structured summary suitable for UPSC
-  aspirants.
+  Analyze the following news article and produce a structured GK summary for UPSC aspirants.
+  Use Markdown formatting throughout.
 
   Article:
   {article_body}
 
-  Output format:
-  - GK Gist: 3-5 bullet points of key takeaways
-  - Syllabus Topic: The most relevant UPSC GS paper and topic
-  - Key Terms: Comma-separated list of important terms/people/places
+  Output format — follow this exact structure with these section headers:
+
+  ### GK Summary
+  Write **bullet points** for quick reading. Each bullet must cover:
+  - **Event** — what, where, when
+  - **Key actors** — who is involved
+  - **Why it matters** — UPSC/India angle
+  - **Significance** — implications, context, or precedent
+
+  ### GK Pointers for UPSC
+  Write **4-6 bullet points** with exam-ready GK facts. CRITICAL: Each bullet MUST be a **complete, self-contained sentence** that reads meaningfully on its own (subject + verb + object). For example:
+  - GOOD: "Sex Ratio at Birth in Haryana dropped to 898 girls per 1,000 boys in Jan-Apr 2026, below the national average of 900+."
+  - BAD: "2026 (Jan-Apr): 898 girls per 1,000 boys."
+  Each point must include:
+  - **Bold key concept** followed by a complete sentence with hard data
+  - Numbers, percentages, dates, ranks, thresholds in **bold**
+  - Every proper noun (person, place, institution, scheme) in **bold**
+  - Cover: key data, people/institutions involved, constitutional/legal basis, India connect
+
+  ### Law/Rule Change — Comparison
+  [SKIP this section entirely if the article is NOT about a change in law, rule, policy, regulation,
+  scheme, or constitutional provision. Only include if there is a clear before/after comparison.]
+  Use a markdown table with two columns:
+  | Aspect | Old Provision | New Provision |
+  |--------|--------------|--------------|
+  | Rule | Previous position | Amended position |
+  | Threshold | Previous limit | New limit |
+  | Impact | Previous effect | New effect |
+  Minimum 2 rows, maximum 4 rows.
+
+  ### Syllabus Tag
+  One line: GS Paper number — Topic name (e.g., "GS Paper 2 — Polity & Governance: Constitutional Bodies")
+
+  ### Key Terms
+  Comma-separated list of 5-8 important terms, people, places, or concepts to remember.
 
   Response:
