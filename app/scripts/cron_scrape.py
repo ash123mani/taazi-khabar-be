@@ -55,6 +55,9 @@ async def run():
     if not db_url:
         logger.fatal("DATABASE_URL not set")
         sys.exit(1)
+    if "postgresql" in db_url and "+asyncpg" not in db_url:
+        db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    logger.info("Database URL scheme: %s", db_url.split("@")[0].split("://")[0] + "://")
 
     logger.info("Connecting to database ...")
     engine = create_async_engine(db_url, pool_pre_ping=True, pool_size=2)
