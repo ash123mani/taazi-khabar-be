@@ -57,6 +57,9 @@ async def run():
         sys.exit(1)
     if "postgresql" in db_url and "+asyncpg" not in db_url:
         db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    if "prepared_statement_cache_size=0" not in db_url:
+        sep = "&" if "?" in db_url else "?"
+        db_url = f"{db_url}{sep}prepared_statement_cache_size=0"
     logger.info("Database URL scheme: %s", db_url.split("@")[0].split("://")[0] + "://")
 
     logger.info("Connecting to database ...")
