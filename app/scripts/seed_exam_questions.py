@@ -85,7 +85,10 @@ SAMPLE_QUESTIONS = [
 
 
 async def seed() -> None:
-    engine = create_async_engine(settings.database_url)
+    engine = create_async_engine(
+        settings.database_url,
+        connect_args={"statement_cache_size": 0},
+    )
     async_session = async_sessionmaker(engine, expire_on_commit=False)
 
     async with async_session() as session:

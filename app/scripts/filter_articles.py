@@ -32,7 +32,10 @@ async def main():
             print(f"Invalid date: {d}. Use YYYY-MM-DD.")
             sys.exit(1)
 
-    engine = create_async_engine(settings.database_url)
+    engine = create_async_engine(
+        settings.database_url,
+        connect_args={"statement_cache_size": 0},
+    )
     orchestrator = AIOrchestrator()
 
     all_to_delete = []

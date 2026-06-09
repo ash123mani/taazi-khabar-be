@@ -122,9 +122,6 @@ class Settings(BaseSettings):
             raise ValueError("database_url must be a PostgreSQL connection string")
         if "+asyncpg" not in v:
             v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
-        if "statement_cache_size=0" not in v:
-            sep = "&" if "?" in v else "?"
-            v = f"{v}{sep}statement_cache_size=0"
         return v
 
     def get_persona_credentials(self, persona: str) -> tuple[str, str]:

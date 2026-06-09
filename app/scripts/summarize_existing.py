@@ -14,7 +14,10 @@ from app.ai.personas import summarizer
 
 
 async def main():
-    engine = create_async_engine(settings.database_url)
+    engine = create_async_engine(
+        settings.database_url,
+        connect_args={"statement_cache_size": 0},
+    )
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
     model_config = registry.get_active_model("summarizer")
