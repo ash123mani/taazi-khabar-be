@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.models.article import Article
+from app.models.category import Category
 from app.models.quiz import QuizArticle
 from app.scrapers.base import ScrapedArticle
 
@@ -68,6 +69,14 @@ async def bulk_upsert_articles(
                 db_article.gk_summary = summary.get("gk_gist")
                 db_article.syllabus_tag = summary.get("syllabus_topic")
                 db_article.key_terms = summary.get("key_terms")
+                cat_name = summary.get("category")
+                if cat_name:
+                    cat = await db.execute(
+                        select(Category).where(Category.name.ilike(cat_name.strip()))
+                    )
+                    cat = cat.scalar_one_or_none()
+                    if cat:
+                        db_article.category_id = cat.id
             except Exception as e:
                 errors.append(f"Summarization failed for {article.url}: {e}")
 

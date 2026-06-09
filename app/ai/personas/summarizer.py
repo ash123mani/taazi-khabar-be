@@ -31,6 +31,7 @@ SECTIONS = {
     "gk pointers": "gist",
     "law/rule change": "gist",
     "syllabus tag": "syllabus",
+    "category": "category",
     "key terms": "terms",
 }
 
@@ -40,6 +41,7 @@ def parse_response(response_text: str) -> dict[str, Any]:
     gist: list[str] = []
     syllabus_topic: str = ""
     key_terms: list[str] = []
+    category: str = ""
     current_section: str | None = None
 
     for line in lines:
@@ -59,6 +61,11 @@ def parse_response(response_text: str) -> dict[str, Any]:
                 rest = _strip_md(stripped[colon + 1:])
                 if rest:
                     syllabus_topic = rest
+                    current_section = None
+            elif colon != -1 and current_section == "category":
+                rest = _strip_md(stripped[colon + 1:])
+                if rest:
+                    category = rest
                     current_section = None
             elif colon != -1 and current_section == "terms":
                 rest = _strip_md(stripped[colon + 1:])
@@ -94,4 +101,5 @@ def parse_response(response_text: str) -> dict[str, Any]:
         "gk_gist": "\n".join(gist) if gist else response_text,
         "syllabus_topic": syllabus_topic or None,
         "key_terms": key_terms,
+        "category": category or None,
     }

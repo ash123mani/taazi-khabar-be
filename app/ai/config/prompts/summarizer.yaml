@@ -44,6 +44,9 @@ prompt_template: |-
   ### Syllabus Tag
   One line: GS Paper number — Topic name (e.g., "GS Paper 2 — Polity & Governance: Constitutional Bodies")
 
+  ### Category
+  One word from: Polity, History, Geography, Economy, Environment, Science & Tech, International Relations, Social Issues, Security
+  
   ### Key Terms
   Comma-separated list of 5-8 important terms, people, places, or concepts to remember.
 

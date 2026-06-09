@@ -62,6 +62,32 @@ class BaseScraper(ABC):
     async def extract_body(self, url: str, client: httpx.AsyncClient) -> str:
         ...
 
+    def _extract_og_image(self, html: str) -> str | None:
+        soup = BeautifulSoup(html, "lxml")
+        for selector in [
+            ("meta", {"property": "og:image"}),
+            ("meta", {"name": "twitter:image"}),
+            ("meta", {"property": "og:image:secure_url"}),
+        ]:
+            tag = soup.find(*selector)
+            if tag and tag.get("content"):
+                return tag["content"]
+        img = soup.find("img", class_=lambda c: c and "lead" in str(c).lower())
+        if img and img.get("src", "").startswith("http"):
+            return img["src"]
+        return None
+
+    async def _try_extract_image(self, url: str, client: httpx.AsyncClient) -> str | None:
+        try:
+            resp = await client.get(
+                url,
+                headers={"User-Agent": "Mozilla/5.0 (compatible; TaaziKhabar/1.0)"},
+                timeout=15.0,
+            )
+            return self._extract_og_image(resp.text)
+        except Exception:
+            return None
+
     async def scrape(self) -> list[ScrapedArticle]:
         entries = await self.fetch_rss()
         articles: list[ScrapedArticle] = []
@@ -74,6 +100,9 @@ class BaseScraper(ABC):
                 except (httpx.HTTPStatusError, httpx.TimeoutException):
                     continue
                 if body:
+                    image_url = entry.get("image_url")
+                    if not image_url:
+                        image_url = await self._try_extract_image(entry["link"], client)
                     articles.append(
                         ScrapedArticle(
                             source=self.__class__.__name__.lower().replace("scraper", ""),
@@ -81,7 +110,7 @@ class BaseScraper(ABC):
                             body_text=body,
                             url=entry["link"],
                             published_at=entry["published"],
-                            image_url=entry.get("image_url"),
+                            image_url=image_url,
                         )
                     )
 
