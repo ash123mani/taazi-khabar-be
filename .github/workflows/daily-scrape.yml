@@ -28,6 +28,7 @@ jobs:
       - name: Run scraper
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          NIM_SUMMARIZER_API_KEY: ${{ secrets.NIM_SUMMARIZER_API_KEY }}
-          NIM_QUESTION_SETTER_API_KEY: ${{ secrets.NIM_QUESTION_SETTER_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NIM_SUMMARIZER_API_KEY }}
+          NVIDIA_API_KEY_SUMMARIZER: ${{ secrets.NIM_SUMMARIZER_API_KEY }}
+          NVIDIA_API_KEY_QUESTION_SETTER: ${{ secrets.NIM_QUESTION_SETTER_API_KEY }}
         run: python -m app.scripts.cron_scrape

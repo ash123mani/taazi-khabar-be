@@ -35,6 +35,11 @@ class NIMProvider(BaseProvider):
         presence_penalty: float = 0.0,
     ) -> ProviderResponse:
         key = api_key or self.api_key
+        if not key:
+            raise ValueError(
+                "NVIDIA NIM API key is empty. "
+                "Set NVIDIA_API_KEY (global) or NVIDIA_API_KEY_{persona} env var."
+            )
         client = await self._get_client(base_url)
         payload: dict[str, Any] = {
             "model": model,
