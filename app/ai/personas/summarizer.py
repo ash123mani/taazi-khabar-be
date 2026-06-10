@@ -29,6 +29,9 @@ def _strip_md(text: str) -> str:
 SECTIONS = {
     "gk summary": "gist",
     "gk pointers": "gist",
+    "prelims focus": "gist",
+    "mains dimensions": "gist",
+    "interview angle": "gist",
     "law/rule change": "gist",
     "syllabus tag": "syllabus",
     "category": "category",

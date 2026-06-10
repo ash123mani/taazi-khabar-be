@@ -4,6 +4,11 @@ system: |-
   Prioritize exam-relevant facts, inter-linkages, and conceptual clarity.
   Be precise, factual, and concise. Every sentence should add value for exam preparation.
 
+  Read each article from three perspectives:
+  - **Prelims**: Extract objective-ready facts — data, locations, constitutional articles, schemes, committees, reports, judgments.
+  - **Mains**: Multi-dimensional analysis — social, economic, environmental, political, legal dimensions. Inter-linkages with syllabus topics, government policies, committee recommendations, comparative analysis.
+  - **Interview**: Opinion, solutions, administrative challenges, ethical dilemmas, what more can be done, India's position globally.
+
 prompt_template: |-
   Analyze the following news article and produce a structured GK summary for UPSC aspirants.
   Use Markdown formatting throughout.
@@ -17,18 +22,40 @@ prompt_template: |-
   Write **bullet points** for quick reading. Each bullet must cover:
   - **Event** — what, where, when
   - **Key actors** — who is involved
-  - **Why it matters** — UPSC/India angle
+  - **Why it matters** — UPSC/India angle  
   - **Significance** — implications, context, or precedent
 
-  ### GK Pointers for UPSC
-  Write **4-6 bullet points** with exam-ready GK facts. CRITICAL: Each bullet MUST be a **complete, self-contained sentence** that reads meaningfully on its own (subject + verb + object). For example:
-  - GOOD: "Sex Ratio at Birth in Haryana dropped to 898 girls per 1,000 boys in Jan-Apr 2026, below the national average of 900+."
-  - BAD: "2026 (Jan-Apr): 898 girls per 1,000 boys."
-  Each point must include:
-  - **Bold key concept** followed by a complete sentence with hard data
+  ### Prelims Focus
+  Write **3-5 bullet points** with exam-ready facts that can appear in Prelims.
+  CRITICAL: Each bullet MUST be a **complete, self-contained sentence** (subject + verb + object).
+  Include:
+  - **Bold key concept** followed by hard data
   - Numbers, percentages, dates, ranks, thresholds in **bold**
-  - Every proper noun (person, place, institution, scheme) in **bold**
-  - Cover: key data, people/institutions involved, constitutional/legal basis, India connect
+  - Every proper noun (person, place, institution, scheme, act) in **bold**
+  - Constitutional articles, committee names, report titles, scientific terms
+  - Location-based facts (hills, rivers, states, borders) for Geography
+  - Example: "**Section 6A** of the **Citizenship Act, 1955** was challenged in the **Supreme Court** for its constitutional validity under **Article 14**."
+
+  ### Mains Dimensions
+  Write **3-5 bullet points** analyzing the article from multiple dimensions.
+  Cover relevant aspects from:
+  - **Social** — impact on vulnerable sections, gender, health, education
+  - **Economic** — fiscal impact, trade, industry, infrastructure, employment
+  - **Environmental** — ecological impact, conservation, climate change
+  - **Political/Administrative** — federal issues, policy challenges, governance
+  - **Legal/Constitutional** — relevant articles, landmark judgments, legal debates
+  - **International Relations** — bilateral/multilateral implications, geopolitics
+  - **Inter-linkages** — connect with other GS papers and topics
+  Example: "This verdict links **Article 14 (Right to Equality)** with **tribal rights under the Forest Rights Act, 2006**, raising questions about **sustainable development vs conservation**."
+
+  ### Interview Angle
+  Write **1-2 points** covering:
+  - Your opinion on the issue
+  - Administrative challenges and solutions
+  - Ethical dilemmas involved
+  - What more can be done
+  - India's position compared to global standards
+  Example: "While the government has strengthened cyber laws, implementation at the grassroots remains weak. Citizens need **digital literacy campaigns** alongside stricter enforcement. India can learn from **EU's GDPR framework**."
 
   ### Law/Rule Change — Comparison
   [SKIP this section entirely if the article is NOT about a change in law, rule, policy, regulation,
