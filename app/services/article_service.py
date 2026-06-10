@@ -1,3 +1,4 @@
+import asyncio
 from datetime import date, datetime
 from email.utils import parsedate_to_datetime
 from uuid import UUID
@@ -30,57 +31,75 @@ async def bulk_upsert_articles(
     existing = await db.execute(select(Article.url).where(Article.url.in_(urls)))
     existing_urls = {row[0] for row in existing.fetchall()}
 
-    created = 0
-    skipped = 0
-    filtered_out = 0
+    new_articles = [a for a in articles if a.url not in existing_urls]
+    skipped = len(articles) - len(new_articles)
+
+    if not new_articles:
+        return 0, skipped, [], 0
+
+    sem = asyncio.Semaphore(5)
     errors: List[str] = []
 
-    for article in articles:
-        if article.url in existing_urls:
-            skipped += 1
-            continue
-
-        if article_filter:
+    # Phase 1: parallel filter
+    async def check_article(a: ScrapedArticle) -> bool:
+        if not article_filter:
+            return True
+        async with sem:
             try:
-                is_relevant = await article_filter(headline=article.headline, body_text=article.body_text)
-                if not is_relevant:
-                    filtered_out += 1
-                    existing_urls.add(article.url)
-                    continue
-            except Exception as e:
-                errors.append(f"Filter failed for {article.url}: {e}")
-                existing_urls.add(article.url)
-                continue
+                return await article_filter(headline=a.headline, body_text=a.body_text)
+            except Exception:
+                return False
 
+    filter_results = await asyncio.gather(*[check_article(a) for a in new_articles])
+    filtered_articles = [a for a, ok in zip(new_articles, filter_results) if ok]
+    filtered_out = sum(1 for ok in filter_results if not ok)
+
+    if not filtered_articles:
+        return 0, skipped, errors, filtered_out
+
+    # Phase 2: batch insert
+    created_articles = []
+    for a in filtered_articles:
         db_article = Article(
-            source=article.source,
-            headline=article.headline,
-            body_text=article.body_text,
-            url=article.url,
-            published_at=_parse_rss_date(article.published_at),
-            image_url=article.image_url,
+            source=a.source, headline=a.headline, body_text=a.body_text,
+            url=a.url, published_at=_parse_rss_date(a.published_at),
+            image_url=a.image_url,
         )
         db.add(db_article)
-        await db.flush()
+        created_articles.append((db_article, a))
+    await db.flush()
 
-        if summarizer:
+    # Phase 3: parallel summarize (no db passed — logging skipped for speed)
+    async def summarize_one(a: ScrapedArticle) -> dict | None:
+        if not summarizer:
+            return None
+        async with sem:
             try:
-                summary = await summarizer(article.body_text, article_id=db_article.id, db=db)
-                db_article.gk_summary = summary.get("gk_gist")
-                db_article.syllabus_tag = summary.get("syllabus_topic")
-                db_article.key_terms = summary.get("key_terms")
-                cat_name = summary.get("category")
-                if cat_name:
-                    cat = await db.execute(
-                        select(Category).where(Category.name.ilike(cat_name.strip()))
-                    )
-                    cat = cat.scalar_one_or_none()
-                    if cat:
-                        db_article.category_id = cat.id
+                return await summarizer(a.body_text)
             except Exception as e:
-                errors.append(f"Summarization failed for {article.url}: {e}")
+                errors.append(f"Summarization failed for {a.url}: {e}")
+                return None
 
-        existing_urls.add(article.url)
+    summary_results = await asyncio.gather(*[
+        summarize_one(a) for _, a in created_articles
+    ])
+
+    # Phase 4: apply summaries to DB (sequential)
+    created = 0
+    for (art, _), summary in zip(created_articles, summary_results):
+        if not summary:
+            continue
+        art.gk_summary = summary.get("gk_gist")
+        art.syllabus_tag = summary.get("syllabus_topic")
+        art.key_terms = summary.get("key_terms")
+        cat_name = summary.get("category")
+        if cat_name:
+            cat = await db.execute(
+                select(Category).where(Category.name.ilike(cat_name.strip()))
+            )
+            cat_obj = cat.scalar_one_or_none()
+            if cat_obj:
+                art.category_id = cat_obj.id
         created += 1
 
     await db.commit()

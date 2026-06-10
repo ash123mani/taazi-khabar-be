@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,21 +19,20 @@ async def scrape_articles(
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(get_admin_user),
 ):
-    scrapers = []
+    scrape_tasks = []
     if source in ("all", "thehindu"):
-        scrapers.append(TheHinduScraper())
+        scrape_tasks.append(TheHinduScraper().scrape())
     if source in ("all", "indianexpress"):
-        scrapers.append(IndianExpressScraper())
+        scrape_tasks.append(IndianExpressScraper().scrape())
 
+    results = await asyncio.gather(*scrape_tasks, return_exceptions=True)
     all_articles = []
     scrape_errors = []
-
-    for scraper in scrapers:
-        try:
-            articles = await scraper.scrape()
-            all_articles.extend(articles)
-        except Exception as e:
-            scrape_errors.append(f"{scraper.__class__.__name__}: {e}")
+    for r in results:
+        if isinstance(r, Exception):
+            scrape_errors.append(str(r))
+        else:
+            all_articles.extend(r)
 
     orchestrator = AIOrchestrator()
 

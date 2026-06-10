@@ -76,28 +76,33 @@ async def run():
         except Exception as e:
             logger.warning("Model registry seed skipped: %s", e)
 
-    scrapers = [TheHinduScraper(), IndianExpressScraper()]
-    all_articles = []
-    errors = []
+    scrapers: list[tuple[str, str]] = [
+        ("TheHindu", "thehindu"),
+        ("IndianExpress", "indianexpress"),
+    ]
 
-    for scraper in scrapers:
-        name = scraper.__class__.__name__.replace("Scraper", "")
+    async def fetch_one(name: str, source: str) -> tuple[list, str | None]:
+        scraper_cls = TheHinduScraper if source == "thehindu" else IndianExpressScraper
         logger.info("--- Scraping %s ---", name)
         t0 = time.time()
         try:
-            articles = await scraper.scrape()
+            articles = await scraper_cls().scrape()
             elapsed = time.time() - t0
-            logger.info(
-                "  %s: %d RSS entries fetched in %.1fs",
-                name, len(articles), elapsed,
-            )
+            logger.info("  %s: %d articles fetched in %.1fs", name, len(articles), elapsed)
             for a in articles:
                 logger.info("  · [%s] %s", a.source, a.headline[:100])
-            all_articles.extend(articles)
+            return articles, None
         except Exception as e:
-            msg = f"{name}: {e}"
             logger.error("  %s FAILED: %s", name, e)
-            errors.append(msg)
+            return [], f"{name}: {e}"
+
+    results = await asyncio.gather(*[fetch_one(n, s) for n, s in scrapers])
+    all_articles = []
+    errors = []
+    for articles, err in results:
+        all_articles.extend(articles)
+        if err:
+            errors.append(err)
 
     if not all_articles:
         logger.warning("No articles scraped. Nothing to do.")
@@ -119,9 +124,9 @@ async def run():
 
     orchestrator = AIOrchestrator()
 
-    async def summarize(body: str, article_id=None, db=None):
+    async def summarize(body: str):
         return await orchestrator.summarize_article(
-            article_body=body, article_id=article_id, db=db,
+            article_body=body, article_id=None, db=None,
         )
 
     async def filterer(headline: str, body_text: str):

@@ -1,3 +1,4 @@
+import asyncio
 import time
 from typing import Any
 
@@ -8,11 +9,24 @@ from app.config import settings
 
 
 class NIMProvider(BaseProvider):
+    _semaphore = asyncio.Semaphore(5)
+    _last_request_time = 0.0
+    _rate_limit_lock = asyncio.Lock()
+
     def __init__(self) -> None:
         self.base_url = settings.nvidia_nim_base_url
         self.api_key = settings.nvidia_api_key.get_secret_value()
         self._client: httpx.AsyncClient | None = None
         self._current_base_url: str = ""
+
+    async def _throttle(self) -> None:
+        min_interval = 1.5  # 40 RPM = 1 per 1.5s
+        async with self._rate_limit_lock:
+            now = time.monotonic()
+            since_last = now - self._last_request_time
+            if since_last < min_interval:
+                await asyncio.sleep(min_interval - since_last)
+            self._last_request_time = time.monotonic()
 
     async def _get_client(self, base_url: str = "") -> httpx.AsyncClient:
         url = base_url or self.base_url
@@ -20,6 +34,30 @@ class NIMProvider(BaseProvider):
             self._client = httpx.AsyncClient(base_url=url, timeout=300.0)
             self._current_base_url = url
         return self._client
+
+    async def _request_with_retry(
+        self, client: httpx.AsyncClient, payload: dict, headers: dict,
+    ) -> ProviderResponse:
+        for attempt in range(3):
+            await self._throttle()
+            start = time.monotonic()
+            response = await client.post("/chat/completions", json=payload, headers=headers)
+            elapsed = (time.monotonic() - start) * 1000.0
+            if response.status_code == 429 and attempt < 2:
+                try:
+                    retry_after = float(response.headers.get("Retry-After", "5"))
+                except (ValueError, TypeError):
+                    retry_after = 5
+                await asyncio.sleep(retry_after * (2 ** attempt))
+                continue
+            response.raise_for_status()
+            data = response.json()
+            return ProviderResponse(
+                text=data["choices"][0]["message"]["content"],
+                tokens_used=data.get("usage", {}).get("total_tokens", 0),
+                latency_ms=elapsed,
+            )
+        raise RuntimeError("Rate-limited after 3 retries")
 
     async def complete(
         self,
@@ -53,23 +91,12 @@ class NIMProvider(BaseProvider):
             "frequency_penalty": frequency_penalty,
             "presence_penalty": presence_penalty,
         }
-
         headers = {
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
         }
-
-        start = time.monotonic()
-        response = await client.post("/chat/completions", json=payload, headers=headers)
-        elapsed = (time.monotonic() - start) * 1000.0
-        response.raise_for_status()
-        data = response.json()
-
-        return ProviderResponse(
-            text=data["choices"][0]["message"]["content"],
-            tokens_used=data.get("usage", {}).get("total_tokens", 0),
-            latency_ms=elapsed,
-        )
+        async with self._semaphore:
+            return await self._request_with_retry(client, payload, headers)
 
     async def complete_with_lora(
         self,
@@ -89,21 +116,10 @@ class NIMProvider(BaseProvider):
             "temperature": 0.3,
             "max_tokens": 512,
         }
-
         headers = {
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
             "NVCF_LORA_ADAPTER": lora_adapter,
         }
-
-        start = time.monotonic()
-        response = await client.post("/chat/completions", json=payload, headers=headers)
-        elapsed = (time.monotonic() - start) * 1000.0
-        response.raise_for_status()
-        data = response.json()
-
-        return ProviderResponse(
-            text=data["choices"][0]["message"]["content"],
-            tokens_used=data.get("usage", {}).get("total_tokens", 0),
-            latency_ms=elapsed,
-        )
+        async with self._semaphore:
+            return await self._request_with_retry(client, payload, headers)

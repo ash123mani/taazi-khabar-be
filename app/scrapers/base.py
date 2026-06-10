@@ -90,21 +90,20 @@ class BaseScraper(ABC):
 
     async def scrape(self) -> list[ScrapedArticle]:
         entries = await self.fetch_rss()
-        articles: list[ScrapedArticle] = []
+        sem = asyncio.Semaphore(3)
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            for entry in entries:
+        async def process_entry(entry: dict) -> ScrapedArticle | None:
+            async with sem:
                 await asyncio.sleep(self.rate_limit_delay)
                 try:
-                    body = await self.extract_body(entry["link"], client)
-                except (httpx.HTTPStatusError, httpx.TimeoutException):
-                    continue
-                if body:
-                    image_url = entry.get("image_url")
-                    if not image_url:
-                        image_url = await self._try_extract_image(entry["link"], client)
-                    articles.append(
-                        ScrapedArticle(
+                    async with httpx.AsyncClient(timeout=30.0) as client:
+                        body = await self.extract_body(entry["link"], client)
+                        if not body:
+                            return None
+                        image_url = entry.get("image_url")
+                        if not image_url:
+                            image_url = await self._try_extract_image(entry["link"], client)
+                        return ScrapedArticle(
                             source=self.__class__.__name__.lower().replace("scraper", ""),
                             headline=entry["title"],
                             body_text=body,
@@ -112,6 +111,8 @@ class BaseScraper(ABC):
                             published_at=entry["published"],
                             image_url=image_url,
                         )
-                    )
+                except (httpx.HTTPStatusError, httpx.TimeoutException):
+                    return None
 
-        return articles
+        results = await asyncio.gather(*[process_entry(e) for e in entries])
+        return [r for r in results if r is not None]
