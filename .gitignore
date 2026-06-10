@@ -6,3 +6,7 @@ build/
 dist/
 *.egg/
 .pytest_cache/
+*.ipynb_checkpoints/
+
+# Training raw data (large PDFs, not used directly)
+app/ai/training/data/raw/
