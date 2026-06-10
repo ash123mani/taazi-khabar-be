@@ -286,11 +286,24 @@ Group questions by article with a header like "Article 1:" before each group."""
 async def build_quiz_dataset(orch: AIOrchestrator, db: AsyncSession) -> Path:
     out_path = PROC_DIR / "quiz_setter.jsonl"
     articles = await _fetch_articles(db)
-    articles = [a for a in articles if a.gk_summary and len(a.gk_summary) > 100][:30]
+    articles = [a for a in articles if a.gk_summary and len(a.gk_summary) > 100]
     seen = _load_dedup_set(out_path)
-    logger.info("Building quiz dataset from %d articles (6 batches of 5)", len(articles))
 
-    batch_size = 5
+    # Skip articles already in dedup set
+    new_articles = []
+    for a in articles:
+        inp = (a.gk_summary or "")[:500]
+        if inp[:80] not in seen:
+            new_articles.append(a)
+    articles = new_articles[:90]
+    total_batches = (len(articles) + 1) // 2
+    logger.info("Building quiz dataset from %d new articles (%d batches of 2)", len(articles), total_batches)
+
+    if not articles:
+        logger.info("No new articles to process. Already have %d records.", len(seen))
+        return out_path
+
+    batch_size = 2
 
     with open(out_path, "a") as out:
         for i in range(0, len(articles), batch_size):
