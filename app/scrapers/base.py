@@ -1,6 +1,6 @@
 import asyncio
 import time
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass
 
 import feedparser
@@ -58,11 +58,10 @@ class BaseScraper(ABC):
             })
         return entries
 
-    @abstractmethod
-    async def extract_body(self, url: str, client: httpx.AsyncClient) -> str:
-        ...
+    def _extract_og_image(self, html: str, page_url: str = "") -> str | None:
+        from urllib.parse import urljoin
+        from bs4 import BeautifulSoup
 
-    def _extract_og_image(self, html: str) -> str | None:
         soup = BeautifulSoup(html, "lxml")
         for selector in [
             ("meta", {"property": "og:image"}),
@@ -71,22 +70,15 @@ class BaseScraper(ABC):
         ]:
             tag = soup.find(*selector)
             if tag and tag.get("content"):
-                return tag["content"]
+                url = tag["content"]
+                if url.startswith("http"):
+                    return url
+                if page_url:
+                    return urljoin(page_url, url)
         img = soup.find("img", class_=lambda c: c and "lead" in str(c).lower())
         if img and img.get("src", "").startswith("http"):
             return img["src"]
         return None
-
-    async def _try_extract_image(self, url: str, client: httpx.AsyncClient) -> str | None:
-        try:
-            resp = await client.get(
-                url,
-                headers={"User-Agent": "Mozilla/5.0 (compatible; TaaziKhabar/1.0)"},
-                timeout=15.0,
-            )
-            return self._extract_og_image(resp.text)
-        except Exception:
-            return None
 
     async def scrape(self) -> list[ScrapedArticle]:
         entries = await self.fetch_rss()
@@ -95,24 +87,45 @@ class BaseScraper(ABC):
         async def process_entry(entry: dict) -> ScrapedArticle | None:
             async with sem:
                 await asyncio.sleep(self.rate_limit_delay)
-                try:
-                    async with httpx.AsyncClient(timeout=30.0) as client:
-                        body = await self.extract_body(entry["link"], client)
-                        if not body:
-                            return None
-                        image_url = entry.get("image_url")
-                        if not image_url:
-                            image_url = await self._try_extract_image(entry["link"], client)
-                        return ScrapedArticle(
-                            source=self.__class__.__name__.lower().replace("scraper", ""),
-                            headline=entry["title"],
-                            body_text=body,
-                            url=entry["link"],
-                            published_at=entry["published"],
-                            image_url=image_url,
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    # Single fetch: extract og:image from same response
+                    try:
+                        resp = await client.get(
+                            entry["link"],
+                            headers={"User-Agent": "Mozilla/5.0 (compatible; TaaziKhabar/1.0)"},
                         )
-                except (httpx.HTTPStatusError, httpx.TimeoutException):
-                    return None
+                        resp.raise_for_status()
+                    except httpx.HTTPError:
+                        return None
+
+                    raw_html = resp.text
+                    body = self._extract_body_from_html(raw_html)
+                    if not body:
+                        return None
+
+                    image_url = entry.get("image_url")
+                    if not image_url:
+                        image_url = self._extract_og_image(raw_html, entry["link"])
+
+                    return ScrapedArticle(
+                        source=self.__class__.__name__.lower().replace("scraper", ""),
+                        headline=entry["title"],
+                        body_text=body,
+                        url=entry["link"],
+                        published_at=entry["published"],
+                        image_url=image_url,
+                    )
 
         results = await asyncio.gather(*[process_entry(e) for e in entries])
         return [r for r in results if r is not None]
+
+    def _extract_body_from_html(self, html: str) -> str:
+        """Default body extraction using readability. Subclasses should override."""
+        from readability import Document
+        from bs4 import BeautifulSoup
+
+        doc = Document(html)
+        soup = BeautifulSoup(doc.summary(), "lxml")
+        for tag in soup(["script", "style", "nav", "footer", "aside"]):
+            tag.decompose()
+        return soup.get_text(separator="\n", strip=True)

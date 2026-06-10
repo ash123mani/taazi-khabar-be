@@ -3,6 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.models.base import Base
@@ -23,3 +24,5 @@ class Article(Base):
     syllabus_tag: str = Column(String(200), nullable=True)
     image_url: str = Column(Text, nullable=True)
     category_id: UUID = Column(PG_UUID(as_uuid=True), ForeignKey("categories.id"), nullable=True)
+
+    category = relationship("Category", lazy="joined")
