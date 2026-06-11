@@ -2,7 +2,7 @@ import asyncio
 from datetime import date, datetime
 from email.utils import parsedate_to_datetime
 from uuid import UUID
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 from sqlalchemy import select, cast, Date, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +11,7 @@ from sqlalchemy.orm import joinedload
 from app.models.article import Article
 from app.models.category import Category
 from app.models.quiz import QuizArticle
+from app.models.cached_question import CachedQuestion
 from app.scrapers.base import ScrapedArticle
 
 
@@ -26,6 +27,7 @@ async def bulk_upsert_articles(
     articles: List[ScrapedArticle],
     summarizer=None,
     article_filter=None,
+    question_setter=None,
 ) -> Tuple[int, int, List[str], int]:
     urls = [a.url for a in articles]
     existing = await db.execute(select(Article.url).where(Article.url.in_(urls)))
@@ -101,6 +103,54 @@ async def bulk_upsert_articles(
             if cat_obj:
                 art.category_id = cat_obj.id
         created += 1
+
+    # Phase 5: parallel question generation for summarized articles
+    async def gen_questions(
+        art: Article,
+        article_body: str,
+    ) -> list[dict]:
+        if not question_setter or not art.gk_summary:
+            return []
+        async with sem:
+            try:
+                return await question_setter(
+                    article_id=art.id,
+                    headline=art.headline,
+                    summary=art.gk_summary,
+                    syllabus_tag=art.syllabus_tag,
+                    key_terms=art.key_terms,
+                )
+            except Exception as e:
+                errors.append(f"Question generation failed for {art.headline[:60]}: {e}")
+                return []
+
+    if question_setter:
+        q_tasks = []
+        for art, orig in created_articles:
+            if art.gk_summary:
+                q_tasks.append(gen_questions(art, orig.body_text))
+        question_results = await asyncio.gather(*q_tasks) if q_tasks else []
+
+        for (art, _), questions in zip(created_articles, question_results):
+            if not questions:
+                continue
+            existing = await db.execute(
+                select(CachedQuestion.id)
+                .where(CachedQuestion.article_id == art.id)
+                .limit(1)
+            )
+            if existing.scalar_one_or_none() is not None:
+                continue
+            for q in questions:
+                db.add(CachedQuestion(
+                    article_id=art.id,
+                    question_text=q["question_text"],
+                    options=q["options"],
+                    correct_answer=q["correct_answer"],
+                    explanation=q.get("explanation"),
+                    difficulty=q.get("difficulty"),
+                ))
+        await db.flush()
 
     await db.commit()
     return created, skipped, errors, filtered_out

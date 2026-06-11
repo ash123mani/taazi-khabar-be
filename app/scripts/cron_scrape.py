@@ -17,6 +17,7 @@ import logging
 import os
 import sys
 import time
+from uuid import UUID
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
@@ -134,6 +135,24 @@ async def run():
             headline=headline, body_text=body_text, db=None,
         )
 
+    async def question_setter(
+        article_id: UUID,
+        headline: str,
+        summary: str,
+        syllabus_tag: str | None,
+        key_terms: list[str] | None,
+    ):
+        article_dict = {
+            "id": str(article_id),
+            "headline": headline,
+            "gk_summary": summary,
+            "syllabus_tag": syllabus_tag or "",
+            "key_terms": key_terms or [],
+        }
+        return await orchestrator.generate_mcq_for_article(
+            article=article_dict, num_questions=3,
+        )
+
     t0 = time.time()
     async with async_session() as db:
         created, skipped, summary_errors, filtered_out = await bulk_upsert_articles(
@@ -141,6 +160,7 @@ async def run():
             articles=all_articles,
             summarizer=summarize,
             article_filter=filterer,
+            question_setter=question_setter,
         )
         await db.commit()
         errors.extend(summary_errors)
@@ -161,6 +181,7 @@ async def run():
     logger.info("  Articles created:   %d", result["articles_created"])
     logger.info("  Articles skipped:   %d (already in DB)", result["articles_skipped"])
     logger.info("  Articles filtered:  %d (not UPSC-relevant)", result["articles_filtered_out"])
+    logger.info("  Questions generated for each article (via question_setter)")
     logger.info("  AI processing time: %.1fs", elapsed)
 
     if summary_errors:

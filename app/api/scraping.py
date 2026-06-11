@@ -50,11 +50,24 @@ async def scrape_articles(
             db=db,
         )
 
+    async def question_setter(article_id, headline, summary, syllabus_tag, key_terms):
+        return await orchestrator.generate_mcq_for_article(
+            article={
+                "id": str(article_id),
+                "headline": headline,
+                "gk_summary": summary,
+                "syllabus_tag": syllabus_tag or "",
+                "key_terms": key_terms or [],
+            },
+            num_questions=3,
+        )
+
     created, skipped, summary_errors, filtered_out = await bulk_upsert_articles(
         db=db,
         articles=all_articles,
         summarizer=summarize,
         article_filter=filterer,
+        question_setter=question_setter,
     )
 
     all_errors = scrape_errors + summary_errors

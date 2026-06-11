@@ -142,11 +142,24 @@ async def scrape_date(
     async def filterer(headline: str, body_text: str):
         return await orchestrator.filter_article(headline=headline, body_text=body_text, db=db)
 
+    async def question_setter(article_id, headline, summary, syllabus_tag, key_terms):
+        return await orchestrator.generate_mcq_for_article(
+            article={
+                "id": str(article_id),
+                "headline": headline,
+                "gk_summary": summary,
+                "syllabus_tag": syllabus_tag or "",
+                "key_terms": key_terms or [],
+            },
+            num_questions=3,
+        )
+
     created, skipped, summary_errors, filtered_out = await bulk_upsert_articles(
         db=db,
         articles=filtered,
         summarizer=summarize,
         article_filter=filterer,
+        question_setter=question_setter,
     )
 
     return {
@@ -535,11 +548,14 @@ async def generate_summaries(
     result = await db.execute(select(Article).where(Article.id.in_(uuids)))
     articles = result.scalars().all()
 
+    from app.models.cached_question import CachedQuestion
+
     orchestrator = AIOrchestrator()
     updated = 0
     errors = []
 
-    for article in articles:
+    async def process_article(article):
+        nonlocal updated
         try:
             summary = await orchestrator.summarize_article(
                 article_body=article.body_text,
@@ -549,9 +565,43 @@ async def generate_summaries(
             article.gk_summary = summary.get("gk_gist")
             article.syllabus_tag = summary.get("syllabus_topic")
             article.key_terms = summary.get("key_terms")
+
+            # Generate and cache questions
+            try:
+                questions = await orchestrator.generate_mcq_for_article(
+                    article={
+                        "id": str(article.id),
+                        "headline": article.headline,
+                        "gk_summary": article.gk_summary or "",
+                        "syllabus_tag": article.syllabus_tag or "",
+                        "key_terms": article.key_terms or [],
+                    },
+                    num_questions=3,
+                )
+                existing = await db.execute(
+                    select(CachedQuestion.id)
+                    .where(CachedQuestion.article_id == article.id)
+                    .limit(1)
+                )
+                if existing.scalar_one_or_none() is None:
+                    for q in questions:
+                        db.add(CachedQuestion(
+                            article_id=article.id,
+                            question_text=q["question_text"],
+                            options=q["options"],
+                            correct_answer=q["correct_answer"],
+                            explanation=q.get("explanation"),
+                            difficulty=q.get("difficulty"),
+                        ))
+            except Exception as qe:
+                errors.append(f"Questions failed for {article.id}: {qe}")
+
             updated += 1
         except Exception as e:
             errors.append(f"{article.id}: {e}")
+
+    for article in articles:
+        await process_article(article)
 
     await db.commit()
 
