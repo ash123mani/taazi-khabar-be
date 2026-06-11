@@ -565,6 +565,15 @@ async def generate_summaries(
             article.gk_summary = summary.get("gk_gist")
             article.syllabus_tag = summary.get("syllabus_topic")
             article.key_terms = summary.get("key_terms")
+            cat_name = summary.get("category")
+            if cat_name:
+                from app.models.category import Category
+                cat_result = await db.execute(
+                    select(Category).where(Category.name.ilike(cat_name.strip()))
+                )
+                cat_obj = cat_result.scalar_one_or_none()
+                if cat_obj:
+                    article.category_id = cat_obj.id
 
             # Generate and cache questions
             try:
