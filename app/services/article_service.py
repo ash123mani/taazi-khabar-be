@@ -201,48 +201,36 @@ async def get_article_counts(
     article_date: date | None = None,
     source: str | None = None,
 ) -> dict:
-    from sqlalchemy import func, cast as sql_cast, Date
+    from sqlalchemy import text
 
-    base = select(Article)
-
-    if article_date:
-        base = base.where(sql_cast(Article.published_at, Date) == article_date)
-
-    # Source counts (always unfiltered by source)
-    source_base = select(Article)
-    if article_date:
-        source_base = source_base.where(sql_cast(Article.published_at, Date) == article_date)
-    source_counts: dict[str, int] = {}
-    for src in ('thehindu', 'indianexpress'):
-        sq = select(func.count()).select_from(Article).where(Article.source == src)
-        if article_date:
-            sq = sq.where(sql_cast(Article.published_at, Date) == article_date)
-        result = await db.execute(sq)
-        source_counts[src] = result.scalar() or 0
+    date_filter = f"DATE(published_at) = '{article_date.isoformat()}'" if article_date else "TRUE"
 
     # Total
-    total_q = select(func.count()).select_from(Article)
-    if article_date:
-        total_q = total_q.where(sql_cast(Article.published_at, Date) == article_date)
-    result = await db.execute(total_q)
-    total = result.scalar() or 0
+    total_q = text(f"SELECT COUNT(*) FROM articles WHERE {date_filter}")
+    total = (await db.execute(total_q)).scalar() or 0
 
-    # Category counts (optionally scoped by source)
-    cat_q = select(
-        Article.category_id,
-        func.count().label("cnt"),
-    ).where(Article.category_id.isnot(None)).group_by(Article.category_id)
-    if article_date:
-        cat_q = cat_q.where(sql_cast(Article.published_at, Date) == article_date)
-    if source:
-        cat_q = cat_q.where(Article.source == source)
+    # Source counts
+    thehindu_q = text(f"SELECT COUNT(*) FROM articles WHERE source = 'thehindu' AND {date_filter}")
+    thehindu = (await db.execute(thehindu_q)).scalar() or 0
+
+    indianexpress_q = text(f"SELECT COUNT(*) FROM articles WHERE source = 'indianexpress' AND {date_filter}")
+    indianexpress = (await db.execute(indianexpress_q)).scalar() or 0
+
+    # Category counts
+    source_filter = f"AND source = '{source}'" if source else ""
+    cat_q = text(f"""
+        SELECT category_id::text, COUNT(*) as cnt
+        FROM articles
+        WHERE category_id IS NOT NULL AND {date_filter} {source_filter}
+        GROUP BY category_id
+    """)
     cat_result = await db.execute(cat_q)
-    categories = {str(row[0]): row[1] for row in cat_result.fetchall()}
+    categories = {row[0]: row[1] for row in cat_result.fetchall()}
 
     return {
         "total": total,
-        "thehindu": source_counts.get("thehindu", 0),
-        "indianexpress": source_counts.get("indianexpress", 0),
+        "thehindu": thehindu,
+        "indianexpress": indianexpress,
         "categories": categories,
     }
 

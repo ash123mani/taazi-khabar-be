@@ -73,7 +73,10 @@ async def get_article_counts(
             article_date = date_type.fromisoformat(date_str)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid date format, use YYYY-MM-DD")
-    return await article_service.get_article_counts(db, article_date=article_date, source=source)
+    try:
+        return await article_service.get_article_counts(db, article_date=article_date, source=source)
+    except Exception as e:
+        return {"total": 0, "thehindu": 0, "indianexpress": 0, "categories": {}, "_error": str(e)}
 
 
 @router.get("/{article_id}", response_model=ArticleResponse)
