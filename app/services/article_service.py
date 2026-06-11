@@ -196,6 +196,57 @@ async def list_articles(
     return articles, total
 
 
+async def get_article_counts(
+    db: AsyncSession,
+    article_date: date | None = None,
+    source: str | None = None,
+) -> dict:
+    from sqlalchemy import func, cast as sql_cast, Date
+
+    base = select(Article)
+
+    if article_date:
+        base = base.where(sql_cast(Article.published_at, Date) == article_date)
+
+    # Source counts (always unfiltered by source)
+    source_base = select(Article)
+    if article_date:
+        source_base = source_base.where(sql_cast(Article.published_at, Date) == article_date)
+    source_counts: dict[str, int] = {}
+    for src in ('thehindu', 'indianexpress'):
+        sq = select(func.count()).select_from(Article).where(Article.source == src)
+        if article_date:
+            sq = sq.where(sql_cast(Article.published_at, Date) == article_date)
+        result = await db.execute(sq)
+        source_counts[src] = result.scalar() or 0
+
+    # Total
+    total_q = select(func.count()).select_from(Article)
+    if article_date:
+        total_q = total_q.where(sql_cast(Article.published_at, Date) == article_date)
+    result = await db.execute(total_q)
+    total = result.scalar() or 0
+
+    # Category counts (optionally scoped by source)
+    cat_q = select(
+        Article.category_id,
+        func.count().label("cnt"),
+    ).where(Article.category_id.isnot(None)).group_by(Article.category_id)
+    if article_date:
+        cat_q = cat_q.where(sql_cast(Article.published_at, Date) == article_date)
+    if source:
+        cat_q = cat_q.where(Article.source == source)
+    cat_result = await db.execute(cat_q)
+    categories = {str(row[0]): row[1] for row in cat_result.fetchall()}
+
+    return {
+        "total": total,
+        "thehindu": source_counts.get("thehindu", 0),
+        "indianexpress": source_counts.get("indianexpress", 0),
+        "categories": categories,
+    }
+
+
 async def get_quizzed_article_ids(db: AsyncSession, article_date: date | None = None) -> set[UUID]:
     query = select(QuizArticle.article_id).distinct()
     if article_date:

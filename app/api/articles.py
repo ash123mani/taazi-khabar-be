@@ -60,6 +60,22 @@ async def list_articles(
     )
 
 
+@router.get("/counts")
+async def get_article_counts(
+    date_str: str | None = Query(None, alias="date"),
+    source: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    from datetime import date as date_type
+    article_date: date_type | None = None
+    if date_str:
+        try:
+            article_date = date_type.fromisoformat(date_str)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format, use YYYY-MM-DD")
+    return await article_service.get_article_counts(db, article_date=article_date, source=source)
+
+
 @router.get("/{article_id}", response_model=ArticleResponse)
 async def get_article(article_id: UUID, db: AsyncSession = Depends(get_db)):
     article = await article_service.get_article_by_id(db, article_id)
