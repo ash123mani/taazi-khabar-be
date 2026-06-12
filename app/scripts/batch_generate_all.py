@@ -34,6 +34,7 @@ from app.models.article import Article
 from app.models.category import Category
 from app.models.cached_question import CachedQuestion
 from app.ai.personas import question_setter as qs_persona
+from app.ai.orchestrator import AIOrchestrator
 
 logger = logging.getLogger("batch_generate_all")
 
@@ -198,7 +199,7 @@ async def run():
                 nonlocal cat_errors
                 async with cat_sem:
                     keywords = ", ".join((article.key_terms or [])[:6])
-                    gk = (article.gk_summary or "")[:300]
+                    gk = (article.gk_summary or "")[:1000]
                     cat_name = await nim.categorize(article.headline, keywords, gk)
                     if cat_name and cat_name in cat_map:
                         await db.execute(
@@ -249,6 +250,8 @@ async def run():
         gen_ok = 0
         gen_errors = 0
 
+        orchestrator = AIOrchestrator()
+
         async def generate_for_article(article: Article):
             nonlocal gen_ok, gen_errors
             gk = (article.gk_summary or article.body_text or "")[:1500]
@@ -261,7 +264,9 @@ async def run():
             }
 
             async with q_sem:
-                questions = await nim.generate_questions(article_dict)
+                questions =  await orchestrator.generate_mcq_for_article(
+                  article=article_dict, num_questions=3,
+                )
 
             if not questions:
                 gen_errors += 1
