@@ -42,9 +42,14 @@ def parse_response(response_text: str) -> list[dict[str, Any]]:
         if not block:
             continue
 
-        q_match = re.search(r"^Q:\s*(.+?)$", block, re.MULTILINE)
-        if not q_match:
+        # Find position of Q: header and first A) option
+        q_match = re.search(r"^Q:\s*", block, re.MULTILINE)
+        a_match = re.search(r"\nA\)\s", block)
+        if not q_match or not a_match:
             continue
+
+        # Extract multi-line question text between "Q: " and first "A) "
+        question_text = block[q_match.end():a_match.start()].strip()
 
         options: dict[str, str] = {}
         for letter in ("A", "B", "C", "D"):
@@ -65,7 +70,7 @@ def parse_response(response_text: str) -> list[dict[str, Any]]:
         )
 
         questions.append({
-            "question_text": q_match.group(1).strip(),
+            "question_text": question_text,
             "options": options,
             "correct_answer": answer_match.group(1) if answer_match else "A",
             "explanation": explanation_match.group(1).strip() if explanation_match else None,

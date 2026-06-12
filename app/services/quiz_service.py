@@ -1,13 +1,15 @@
 import hashlib
 import math
+from datetime import date as DateType
 from uuid import UUID
-from typing import List
+from typing import List, Optional
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_, cast, Date
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.quiz import Quiz, QuizArticle, QuizQuestion, QuizAnswer
 from app.models.article import Article
+from app.models.category import Category
 from app.models.cached_question import CachedQuestion
 
 
@@ -170,3 +172,152 @@ async def list_user_quizzes(db: AsyncSession, user_id: UUID, skip: int = 0, limi
         .limit(limit)
     )
     return list(result.scalars().all())
+
+
+def compute_date_hash(date: DateType, category_id: Optional[UUID], user_id: UUID, retry: int = 0) -> str:
+    hash_input = f"{date.isoformat()}|{category_id or 'all'}|{user_id}|{retry}"
+    return hashlib.md5(hash_input.encode()).hexdigest()
+
+
+async def get_daily_quiz_summary(
+    db: AsyncSession, article_date: DateType
+) -> list[dict]:
+    result = await db.execute(
+        select(
+            Category.id,
+            Category.name,
+            func.count(func.distinct(Article.id)),
+            func.count(CachedQuestion.id),
+        )
+        .select_from(Article)
+        .join(CachedQuestion, CachedQuestion.article_id == Article.id)
+        .join(Category, Category.id == Article.category_id)
+        .where(cast(Article.published_at, Date) == article_date)
+        .group_by(Category.id, Category.name)
+        .order_by(Category.name)
+    )
+    categories = []
+    for row in result.fetchall():
+        cat_id = row[0]
+        art_result = await db.execute(
+            select(Article.id, Article.headline, Article.source, Article.url, Article.image_url)
+            .where(
+                cast(Article.published_at, Date) == article_date,
+                Article.category_id == cat_id,
+                Article.gk_summary.isnot(None),
+            )
+            .order_by(Article.published_at)
+        )
+        articles = [
+            {
+                "id": str(a[0]),
+                "headline": a[1],
+                "source": a[2],
+                "url": a[3],
+                "image_url": a[4],
+            }
+            for a in art_result.fetchall()
+        ]
+        categories.append({
+            "id": str(cat_id),
+            "name": row[1],
+            "article_count": row[2],
+            "question_count": row[3],
+            "articles": articles,
+        })
+    return categories
+
+
+async def get_cached_questions_for_date(
+    db: AsyncSession,
+    article_date: DateType,
+    category_id: Optional[UUID] = None,
+) -> tuple[list[Article], list[dict]]:
+    query = (
+        select(Article)
+        .where(
+            cast(Article.published_at, Date) == article_date,
+            Article.category_id.isnot(None),
+            Article.gk_summary.isnot(None),
+        )
+        .order_by(Article.published_at)
+    )
+    if category_id:
+        query = query.where(Article.category_id == category_id)
+
+    result = await db.execute(query)
+    articles = list(result.scalars().all())
+
+    questions_data = []
+    for article in articles:
+        cq_result = await db.execute(
+            select(CachedQuestion)
+            .where(CachedQuestion.article_id == article.id)
+            .order_by(CachedQuestion.created_at)
+        )
+        for cq in cq_result.scalars().all():
+            questions_data.append({
+                "question_text": cq.question_text,
+                "options": cq.options,
+                "correct_answer": cq.correct_answer,
+                "explanation": cq.explanation,
+                "difficulty": cq.difficulty,
+                "article_id": article.id,
+            })
+
+    return articles, questions_data
+
+
+async def create_daily_quiz(
+    db: AsyncSession,
+    user_id: UUID,
+    article_date: DateType,
+    category_id: Optional[UUID] = None,
+) -> Quiz:
+    base_hash = compute_date_hash(article_date, category_id, user_id)
+    prefix = base_hash[:20]
+
+    # Return existing unfinished quiz so user can continue
+    existing_result = await db.execute(
+        select(Quiz).where(
+            Quiz.article_set_hash.like(f"{prefix}%"),
+            Quiz.user_id == user_id,
+            Quiz.score.is_(None),
+        ).order_by(Quiz.created_at.desc()).limit(1)
+    )
+    existing = existing_result.scalar_one_or_none()
+    if existing:
+        return existing
+
+    # Count existing attempts to make a unique hash per retake
+    count_result = await db.execute(
+        select(func.count()).select_from(Quiz).where(
+            Quiz.article_set_hash.like(f"{prefix}%"),
+            Quiz.user_id == user_id,
+        )
+    )
+    retry = count_result.scalar() or 0
+    date_hash = compute_date_hash(article_date, category_id, user_id, retry)
+
+    articles, questions_data = await get_cached_questions_for_date(
+        db, article_date, category_id
+    )
+
+    cat_label = ""
+    if category_id:
+        cat_result = await db.execute(
+            select(Category).where(Category.id == category_id)
+        )
+        cat_obj = cat_result.scalar_one_or_none()
+        if cat_obj:
+            cat_label = f" - {cat_obj.name}"
+
+    quiz = await create_quiz(
+        db=db,
+        user_id=user_id,
+        article_set_hash=date_hash,
+        articles=articles,
+        questions_data=questions_data,
+        title=f"Daily Quiz {article_date.isoformat()}{cat_label}",
+    )
+    return quiz

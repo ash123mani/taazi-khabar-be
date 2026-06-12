@@ -1,0 +1,36 @@
+name: Batch Generate (Categories + Questions)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 4:30 UTC = 10:00 AM IST — runs daily after morning scrape
+    - cron: '30 4 * * *'
+
+concurrency:
+  group: batch-generate
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+
+      - name: Run batch generate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NVIDIA_API_KEY: ${{ secrets.NIM_SUMMARIZER_API_KEY }}
+        run: python -m app.scripts.batch_generate_all

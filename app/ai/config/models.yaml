@@ -9,6 +9,13 @@ models:
         top_p: 1.0
         frequency_penalty: 0.0
         presence_penalty: 0.0
+      - name: "phi-3-lora"
+        provider: "nim"
+        max_tokens: 1024
+        temperature: 0.15
+        top_p: 1.0
+        frequency_penalty: 0.0
+        presence_penalty: 0.0
 
   question_setter:
     active: "nvidia/llama-3.3-nemotron-super-49b-v1.5"
@@ -16,6 +23,13 @@ models:
       - name: "nvidia/llama-3.3-nemotron-super-49b-v1.5"
         provider: "nim"
         max_tokens: 2048
+        temperature: 0.3
+        top_p: 0.9
+        frequency_penalty: 0.0
+        presence_penalty: 0.0
+      - name: "phi-3-lora"
+        provider: "nim"
+        max_tokens: 1024
         temperature: 0.6
         top_p: 0.95
         frequency_penalty: 0.0
@@ -25,6 +39,13 @@ models:
     active: "mistralai/ministral-14b-instruct-2512"
     candidates:
       - name: "mistralai/ministral-14b-instruct-2512"
+        provider: "nim"
+        max_tokens: 64
+        temperature: 0.05
+        top_p: 1.0
+        frequency_penalty: 0.0
+        presence_penalty: 0.0
+      - name: "phi-3-lora"
         provider: "nim"
         max_tokens: 64
         temperature: 0.05

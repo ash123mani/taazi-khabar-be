@@ -16,6 +16,10 @@ from app.schemas.quiz import (
     QuizQuestionResponse,
     QuizSubmitRequest,
     QuizSubmitResponse,
+    DailyQuizSummaryResponse,
+    DailyQuizCategoryItem,
+    DailyQuizStartRequest,
+    DailyQuizStartResponse,
 )
 from app.services import article_service, quiz_service
 from app.ai.orchestrator import AIOrchestrator
@@ -111,6 +115,41 @@ async def generate_quiz(
     )
 
     return QuizGenerateResponse(quiz_id=quiz.id, cached=False)
+
+
+@router.get("/by-date", response_model=DailyQuizSummaryResponse)
+async def daily_quiz_summary(
+    date_str: str | None = None,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from datetime import date
+    quiz_date = date.fromisoformat(date_str) if date_str else date.today()
+    categories = await quiz_service.get_daily_quiz_summary(db, quiz_date)
+    total_articles = sum(c["article_count"] for c in categories)
+    total_questions = sum(c["question_count"] for c in categories)
+    return DailyQuizSummaryResponse(
+        date=quiz_date,
+        categories=[DailyQuizCategoryItem(**c) for c in categories],
+        total_articles=total_articles,
+        total_questions=total_questions,
+    )
+
+
+@router.post("/daily-start", response_model=DailyQuizStartResponse)
+async def start_daily_quiz(
+    req: DailyQuizStartRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    quiz = await quiz_service.create_daily_quiz(
+        db=db,
+        user_id=user.id,
+        article_date=req.date,
+        category_id=req.category_id,
+    )
+    await db.commit()
+    return DailyQuizStartResponse(quiz_id=quiz.id, cached=True)
 
 
 @router.get("/{quiz_id}", response_model=QuizDetailResponse)

@@ -543,59 +543,74 @@ async def generate_summaries(
         raise HTTPException(status_code=400, detail="article_ids is required")
 
     from app.ai.orchestrator import AIOrchestrator
+    from app.models.cached_question import CachedQuestion
+    import asyncio
+    from sqlalchemy import update as sa_update
 
     uuids = [UUID(id) for id in article_ids]
     result = await db.execute(select(Article).where(Article.id.in_(uuids)))
     articles = result.scalars().all()
 
-    from app.models.cached_question import CachedQuestion
-
     orchestrator = AIOrchestrator()
     updated = 0
     errors = []
 
-    async def process_article(article):
-        nonlocal updated
+    for article in articles:
         try:
+            article_id = article.id
+            body_text = article.body_text
+
+            # Re-fetch to avoid stale ORM state across commits
             summary = await orchestrator.summarize_article(
-                article_body=article.body_text,
-                article_id=article.id,
+                article_body=body_text,
+                article_id=article_id,
                 db=db,
             )
-            article.gk_summary = summary.get("gk_gist")
-            article.syllabus_tag = summary.get("syllabus_topic")
-            article.key_terms = summary.get("key_terms")
             cat_name = summary.get("category")
+            category_id = None
             if cat_name:
-                from app.models.category import Category
                 cat_result = await db.execute(
                     select(Category).where(Category.name.ilike(cat_name.strip()))
                 )
                 cat_obj = cat_result.scalar_one_or_none()
                 if cat_obj:
-                    article.category_id = cat_obj.id
+                    category_id = cat_obj.id
+
+            # Truncate verbose summaries to avoid Supabase pooler statement_timeout (15s)
+            gk_summary = (summary.get("gk_gist") or "")[:2000]
+
+            await db.execute(
+                sa_update(Article)
+                .where(Article.id == article_id)
+                .values(
+                    gk_summary=gk_summary,
+                    syllabus_tag=summary.get("syllabus_topic"),
+                    key_terms=summary.get("key_terms"),
+                    category_id=category_id,
+                )
+            )
 
             # Generate and cache questions
             try:
                 questions = await orchestrator.generate_mcq_for_article(
                     article={
-                        "id": str(article.id),
+                        "id": str(article_id),
                         "headline": article.headline,
-                        "gk_summary": article.gk_summary or "",
-                        "syllabus_tag": article.syllabus_tag or "",
-                        "key_terms": article.key_terms or [],
+                        "gk_summary": gk_summary,
+                        "syllabus_tag": summary.get("syllabus_topic", ""),
+                        "key_terms": summary.get("key_terms", []),
                     },
                     num_questions=3,
                 )
                 existing = await db.execute(
                     select(CachedQuestion.id)
-                    .where(CachedQuestion.article_id == article.id)
+                    .where(CachedQuestion.article_id == article_id)
                     .limit(1)
                 )
                 if existing.scalar_one_or_none() is None:
                     for q in questions:
                         db.add(CachedQuestion(
-                            article_id=article.id,
+                            article_id=article_id,
                             question_text=q["question_text"],
                             options=q["options"],
                             correct_answer=q["correct_answer"],
@@ -603,16 +618,17 @@ async def generate_summaries(
                             difficulty=q.get("difficulty"),
                         ))
             except Exception as qe:
-                errors.append(f"Questions failed for {article.id}: {qe}")
+                errors.append(f"Questions failed for {article_id}: {qe}")
 
+            await db.commit()
             updated += 1
+            await asyncio.sleep(15)
         except Exception as e:
-            errors.append(f"{article.id}: {e}")
-
-    for article in articles:
-        await process_article(article)
-
-    await db.commit()
+            try:
+                await db.rollback()
+            except Exception:
+                pass
+            errors.append(f"{article_id}: {e}")
 
     return {"updated": updated, "errors": errors}
 

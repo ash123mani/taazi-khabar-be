@@ -1,6 +1,6 @@
 from uuid import UUID
-from datetime import datetime
-from typing import List, Dict
+from datetime import date, datetime
+from typing import List, Dict, Optional
 
 from pydantic import BaseModel
 
@@ -88,3 +88,36 @@ class QuizSubmitResponse(BaseModel):
     score: int
     total_questions: int
     results: List[Dict]
+
+
+class DailyQuizArticleItem(BaseModel):
+    id: UUID
+    headline: str
+    source: str
+    url: str
+    image_url: str | None = None
+
+
+class DailyQuizCategoryItem(BaseModel):
+    id: UUID
+    name: str
+    article_count: int
+    question_count: int
+    articles: List[DailyQuizArticleItem] = []
+
+
+class DailyQuizSummaryResponse(BaseModel):
+    date: date
+    categories: List[DailyQuizCategoryItem]
+    total_articles: int
+    total_questions: int
+
+
+class DailyQuizStartRequest(BaseModel):
+    date: date
+    category_id: Optional[UUID] = None
+
+
+class DailyQuizStartResponse(BaseModel):
+    quiz_id: UUID
+    cached: bool
