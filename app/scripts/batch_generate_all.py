@@ -199,7 +199,7 @@ async def run():
                 nonlocal cat_errors
                 async with cat_sem:
                     keywords = ", ".join((article.key_terms or [])[:6])
-                    gk = (article.gk_summary or "")[:1000]
+                    gk = (article.gk_summary or "")
                     cat_name = await nim.categorize(article.headline, keywords, gk)
                     if cat_name and cat_name in cat_map:
                         await db.execute(
