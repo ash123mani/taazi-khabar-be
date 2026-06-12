@@ -199,7 +199,7 @@ async def run():
                 nonlocal cat_errors
                 async with cat_sem:
                     keywords = ", ".join((article.key_terms or [])[:6])
-                    gk = (article.gk_summary or "")
+                    gk = (article.gk_summary or "")[:500]
                     cat_name = await nim.categorize(article.headline, keywords, gk)
                     if cat_name and cat_name in cat_map:
                         await db.execute(
@@ -264,9 +264,7 @@ async def run():
             }
 
             async with q_sem:
-                questions =  await orchestrator.generate_mcq_for_article(
-                  article=article_dict, num_questions=3,
-                )
+                questions = await nim.generate_questions(article_dict)
 
             if not questions:
                 gen_errors += 1
@@ -294,7 +292,7 @@ async def run():
             gen_ok += 1
             logger.info("  ✓ %d questions for: %s", len(questions), article.headline[:60])
 
-        batch_size = 20
+        batch_size = 3
         for i in range(0, len(to_generate), batch_size):
             batch = to_generate[i:i + batch_size]
             await asyncio.gather(*[generate_for_article(a) for a in batch])
