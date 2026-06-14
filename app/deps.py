@@ -52,6 +52,26 @@ async def get_current_user(
     return user
 
 
+async def get_optional_user(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> User | None:
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return None
+    token = auth_header[len("Bearer "):]
+    try:
+        payload = jwt.decode(token, settings.nextauth_secret.get_secret_value(), algorithms=["HS256"])
+        user_id = payload.get("sub")
+        if user_id is None:
+            return None
+    except JWTError:
+        return None
+
+    result = await db.execute(select(User).where(User.id == UUID(user_id)))
+    return result.scalar_one_or_none()
+
+
 async def get_admin_user(
     current_user: User = Depends(get_current_user),
 ) -> User:

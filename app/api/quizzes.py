@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import get_db, get_current_user
+from app.deps import get_db, get_current_user, get_optional_user
 from app.models.user import User
 from app.models.article import Article
 from app.schemas.quiz import (
@@ -120,7 +120,7 @@ async def generate_quiz(
 @router.get("/by-date", response_model=DailyQuizSummaryResponse)
 async def daily_quiz_summary(
     date_str: str | None = None,
-    user: User = Depends(get_current_user),
+    user: User | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
     from datetime import date

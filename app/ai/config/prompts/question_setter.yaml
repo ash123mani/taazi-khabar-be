@@ -19,12 +19,13 @@ prompt_template: |-
 
   {article_summaries}
 
-  CRITICAL — PATTERN REQUIREMENTS:
-  - At least HALF of the questions MUST use PATTERN 1 or PATTERN 2 (these are the most distinctive UPSC patterns)
-  - NEVER use PATTERN 4 for more than half the questions
-  - Vary patterns across questions — do NOT use the same pattern for all
+  CRITICAL — PATTERN VARIETY REQUIREMENTS:
+  - You MUST generate ALL 4 patterns across the set — each pattern at least once
+  - If generating fewer than 4 questions, still use as many different patterns as possible
+  - NEVER use the same pattern for more than 2 questions
+  - Do NOT default to one pattern — rotate through all patterns
 
-  === PATTERN 1 — Statement/Pair Evaluation with "How many" (most common in Prelims) ===
+  === PATTERN 1 — Statement/Pair Evaluation with "How many" ===
   Present 3-4 statements or pairs about a topic, then ask how many are correct/matched.
   Options are always: A) Only one  B) Only two  C) Only three  D) All four
   Example:
