@@ -576,8 +576,7 @@ async def generate_summaries(
                 if cat_obj:
                     category_id = cat_obj.id
 
-            # Truncate verbose summaries to avoid Supabase pooler statement_timeout (15s)
-            gk_summary = (summary.get("gk_gist") or "")[:2000]
+            gk_summary = (summary.get("gk_gist") or "")[:10000]
 
             await db.execute(
                 sa_update(Article)
