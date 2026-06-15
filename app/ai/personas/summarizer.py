@@ -76,7 +76,8 @@ def parse_response(response_text: str) -> dict[str, Any]:
                 rest = _strip_md(stripped[colon + 1:])
                 if rest:
                     key_terms = [t.strip() for t in rest.split(",") if t.strip()]
-            gist.append(stripped)
+            if value == "gist":
+                gist.append(stripped)
             continue
 
         if current_section == "syllabus":
