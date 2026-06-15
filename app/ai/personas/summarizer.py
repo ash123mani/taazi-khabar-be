@@ -28,6 +28,8 @@ def _strip_md(text: str) -> str:
 
 SECTIONS = {
     "gk summary": "gist",
+    "key facts": "gist",
+    "analysis": "gist",
     "gk pointers": "gist",
     "prelims focus": "gist",
     "mains dimensions": "gist",
