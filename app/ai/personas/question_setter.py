@@ -34,8 +34,12 @@ def build_prompt(articles: list[dict[str, Any]], num_questions: int) -> tuple[st
 
 
 def parse_response(response_text: str) -> list[dict[str, Any]]:
+    text = response_text.strip()
+    if not text or text.upper().startswith("SKIP"):
+        return []
+
     questions: list[dict[str, Any]] = []
-    blocks = re.split(r"\n---\n", response_text.strip())
+    blocks = re.split(r"\n---\n", text)
 
     for block in blocks:
         block = block.strip()
