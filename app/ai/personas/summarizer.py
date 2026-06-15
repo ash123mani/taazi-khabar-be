@@ -114,9 +114,6 @@ def parse_response(response_text: str) -> dict[str, Any]:
             gist.append(stripped)
 
     gist_text = "\n".join(gist) if gist else response_text
-    gist_text = re.sub(r"^\|.*\|\s*$", "", gist_text, flags=re.MULTILINE)
-    gist_text = re.sub(r"^[-| ]+$", "", gist_text, flags=re.MULTILINE)
-    gist_text = re.sub(r"\n{3,}", "\n\n", gist_text).strip()
 
     return {
         "gk_gist": gist_text,

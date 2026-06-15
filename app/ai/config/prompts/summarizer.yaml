@@ -20,8 +20,8 @@ prompt_template: |-
   Output format — follow this exact structure with these section headers:
 
   ### GK Summary
-  Write **2-3 short paragraphs** (not bullet points, not tables). Just the gist — what happened, where, why it matters for UPSC.
-  Each paragraph max 2 sentences. No lists, no sub-headers, no tables.
+  Write **2-3 short paragraphs** (not bullet points). Just the gist — what happened, where, why it matters for UPSC.
+  Each paragraph max 2 sentences. No lists, no sub-headers.
   Example: "The Supreme Court upheld the Places of Worship Act, 1991, freezing religious character of places as of August 15, 1947. The ruling reinforces secularism as part of the Basic Structure doctrine."
 
   ### Key Facts
