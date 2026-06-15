@@ -7,7 +7,7 @@ system: |-
   Output must be compact:
   - **GK Summary**: 2-3 short paragraphs — only the gist of what the article is about
   - **Key Facts**: 2-3 one-line facts formatted as bold concept + datum
-  - **Analysis**: 2-3 one-line points covering the most exam-relevant dimension(s)
+  - **Analysis**: 3-4 bullet points (1-2 sentences each) covering the most exam-relevant UPSC dimensions
   - **Interview Angle**: 1 short point, only if the issue has a clear opinion/ethical dimension
 
 prompt_template: |-
@@ -32,12 +32,12 @@ prompt_template: |-
   - **Basic Structure doctrine** — first established in Kesavananda Bharati (1973)
 
   ### Analysis
-  Write **2-3 bullet points**. Each covers the most exam-relevant angle(s) in one line.
+  Write **3-4 bullet points**. Each covers the most exam-relevant angle(s) in 1-2 sentences.
   Pick the 1-2 most relevant dimensions from: Social, Economic, Environmental, Political, Legal, International.
   Connect to GS syllabus where possible.
   Example:
-  - **Polity**: The verdict links **Article 25** (religious freedom) with **Basic Structure**, limiting Parliament's power to amend secular character.
-  - **IR**: The ruling aligns with India's position on religious neutrality, relevant for bilateral ties with neighbours.
+  - **Polity**: The verdict links **Article 25** (religious freedom) with **Basic Structure**, limiting Parliament's power to amend secular character. This reinforces the Basic Structure doctrine first established in Kesavananda Bharati (1973).
+  - **IR**: The ruling aligns with India's position on religious neutrality, relevant for bilateral ties with neighbours. Could impact India's stance at the UN on religious freedom resolutions.
 
   ### Interview Angle
   Write **1 short point** covering opinion, challenge, or way forward.
