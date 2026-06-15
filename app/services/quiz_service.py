@@ -1,6 +1,6 @@
 import hashlib
 import math
-from datetime import date as DateType
+from datetime import date as DateType, datetime, timezone
 from uuid import UUID
 from typing import List, Optional
 
@@ -158,6 +158,8 @@ async def submit_answers(
     quiz = await get_quiz_by_id(db, quiz_id)
     if quiz:
         quiz.score = score
+        if quiz.created_at:
+            quiz.time_taken_sec = int((datetime.now(timezone.utc) - quiz.created_at).total_seconds())
 
     await db.flush()
     return score, total, results
