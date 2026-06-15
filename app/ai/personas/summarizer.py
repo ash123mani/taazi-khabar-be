@@ -113,8 +113,13 @@ def parse_response(response_text: str) -> dict[str, Any]:
         if current_section == "gist":
             gist.append(stripped)
 
+    gist_text = "\n".join(gist) if gist else response_text
+    gist_text = re.sub(r"^\|.*\|\s*$", "", gist_text, flags=re.MULTILINE)
+    gist_text = re.sub(r"^[-| ]+$", "", gist_text, flags=re.MULTILINE)
+    gist_text = re.sub(r"\n{3,}", "\n\n", gist_text).strip()
+
     return {
-        "gk_gist": "\n".join(gist) if gist else response_text,
+        "gk_gist": gist_text,
         "syllabus_topic": syllabus_topic or None,
         "key_terms": key_terms,
         "category": category or None,
