@@ -125,31 +125,33 @@ async def bulk_upsert_articles(
                 return []
 
     if question_setter:
-        q_tasks = []
+        q_articles: list[Article] = []
+        q_coros = []
         for art, orig in created_articles:
             if art.gk_summary:
-                q_tasks.append(gen_questions(art, orig.body_text))
-        question_results = await asyncio.gather(*q_tasks) if q_tasks else []
-
-        for (art, _), questions in zip(created_articles, question_results):
-            if not questions:
-                continue
-            existing = await db.execute(
-                select(CachedQuestion.id)
-                .where(CachedQuestion.article_id == art.id)
-                .limit(1)
-            )
-            if existing.scalar_one_or_none() is not None:
-                continue
-            for q in questions:
-                db.add(CachedQuestion(
-                    article_id=art.id,
-                    question_text=q["question_text"],
-                    options=q["options"],
-                    correct_answer=q["correct_answer"],
-                    explanation=q.get("explanation"),
-                    difficulty=q.get("difficulty"),
-                ))
+                q_articles.append(art)
+                q_coros.append(gen_questions(art, orig.body_text))
+        if q_coros:
+            question_results = await asyncio.gather(*q_coros)
+            for art, questions in zip(q_articles, question_results):
+                if not questions:
+                    continue
+                existing = await db.execute(
+                    select(CachedQuestion.id)
+                    .where(CachedQuestion.article_id == art.id)
+                    .limit(1)
+                )
+                if existing.scalar_one_or_none() is not None:
+                    continue
+                for q in questions:
+                    db.add(CachedQuestion(
+                        article_id=art.id,
+                        question_text=q["question_text"],
+                        options=q["options"],
+                        correct_answer=q["correct_answer"],
+                        explanation=q.get("explanation"),
+                        difficulty=q.get("difficulty"),
+                    ))
         await db.flush()
 
     await db.commit()

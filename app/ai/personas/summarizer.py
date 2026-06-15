@@ -97,6 +97,16 @@ def parse_response(response_text: str) -> dict[str, Any]:
             current_section = None
             continue
 
+        if current_section == "category":
+            if "###" in lower:
+                current_section = None
+                continue
+            clean = _strip_md(stripped.lstrip("- ").lstrip("* "))
+            if clean:
+                category = clean
+                current_section = None
+            continue
+
         if current_section == "gist":
             gist.append(stripped)
 

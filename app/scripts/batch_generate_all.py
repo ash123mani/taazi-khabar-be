@@ -19,6 +19,7 @@ Usage:
 import asyncio
 import logging
 import os
+import re
 import sys
 import time
 from uuid import UUID
@@ -125,8 +126,10 @@ class NIMClient:
         }
         async with self._semaphore:
             content = await self._request(payload)
-        if content and content.strip() in CATEGORIES:
-            return content.strip()
+        if content:
+            cleaned = re.sub(r'[*_#]+', '', content).strip()
+            if cleaned in CATEGORIES:
+                return cleaned
         return None
 
     async def generate_questions(self, article: dict) -> list[dict]:
@@ -171,7 +174,7 @@ async def run():
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
     # --- API client ---
-    api_key = os.environ.get("NVIDIA_API_KEY") or str(settings.nvidia_api_key)
+    api_key = os.environ.get("NVIDIA_API_KEY") or settings.nvidia_api_key.get_secret_value()
     if not api_key:
         logger.fatal("NVIDIA_API_KEY not set")
         sys.exit(1)

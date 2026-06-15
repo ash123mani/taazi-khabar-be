@@ -52,7 +52,7 @@ async def run():
     logger.info("CRON SCRAPE START")
     logger.info("Local time: %s", cst)
 
-    db_url = os.environ.get("DATABASE_URL") or str(settings.database_url)
+    db_url = os.environ.get("DATABASE_URL") or settings.database_url.get_secret_value()
     if not db_url:
         logger.fatal("DATABASE_URL not set")
         sys.exit(1)
