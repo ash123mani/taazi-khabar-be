@@ -33,6 +33,10 @@ def build_prompt(articles: list[dict[str, Any]], num_questions: int) -> tuple[st
     return system, prompt
 
 
+def _strip_md(text: str) -> str:
+    return re.sub(r"\*+", "", text).strip()
+
+
 def parse_response(response_text: str) -> list[dict[str, Any]]:
     text = response_text.strip()
     if not text or text.upper().startswith("SKIP"):
@@ -53,7 +57,7 @@ def parse_response(response_text: str) -> list[dict[str, Any]]:
             continue
 
         # Extract multi-line question text between "Q: " and first "A) "
-        question_text = block[q_match.end():a_match.start()].strip()
+        question_text = _strip_md(block[q_match.end():a_match.start()])
 
         options: dict[str, str] = {}
         for letter in ("A", "B", "C", "D"):
@@ -61,7 +65,7 @@ def parse_response(response_text: str) -> list[dict[str, Any]]:
                 rf"^{letter}\)\s*(.+?)$", block, re.MULTILINE
             )
             if opt_match:
-                options[letter] = opt_match.group(1).strip()
+                options[letter] = _strip_md(opt_match.group(1))
 
         answer_match = re.search(
             r"^Answer:\s*([A-D])", block, re.MULTILINE
@@ -77,7 +81,7 @@ def parse_response(response_text: str) -> list[dict[str, Any]]:
             "question_text": question_text,
             "options": options,
             "correct_answer": answer_match.group(1) if answer_match else "A",
-            "explanation": explanation_match.group(1).strip() if explanation_match else None,
+            "explanation": _strip_md(explanation_match.group(1)) if explanation_match else None,
             "difficulty": difficulty_match.group(1) if difficulty_match else None,
         })
 
