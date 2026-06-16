@@ -1,9 +1,6 @@
 name: Daily RSS Scrape
 
 on:
-  schedule:
-    # 16:22 UTC = 21:52 IST — testing
-    - cron: '22 16 * * *'
   workflow_dispatch:
 
 jobs:
