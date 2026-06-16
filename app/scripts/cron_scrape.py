@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 from app.scrapers.the_hindu import TheHinduScraper
 from app.scrapers.indian_express import IndianExpressScraper
+from app.scrapers.pib import PibScraper
 from app.services.article_service import bulk_upsert_articles
 from app.ai.orchestrator import AIOrchestrator
 from app.ai.model_registry import registry
@@ -80,10 +81,17 @@ async def run():
     scrapers: list[tuple[str, str]] = [
         ("TheHindu", "thehindu"),
         ("IndianExpress", "indianexpress"),
+        ("PIB", "pib"),
     ]
 
+    scraper_map = {
+        "thehindu": TheHinduScraper,
+        "indianexpress": IndianExpressScraper,
+        "pib": PibScraper,
+    }
+
     async def fetch_one(name: str, source: str) -> tuple[list, str | None]:
-        scraper_cls = TheHinduScraper if source == "thehindu" else IndianExpressScraper
+        scraper_cls = scraper_map[source]
         logger.info("--- Scraping %s ---", name)
         t0 = time.time()
         try:

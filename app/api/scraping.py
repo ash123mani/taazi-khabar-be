@@ -7,6 +7,7 @@ from app.deps import get_db, get_admin_user
 from app.models.user import User
 from app.scrapers.the_hindu import TheHinduScraper
 from app.scrapers.indian_express import IndianExpressScraper
+from app.scrapers.pib import PibScraper
 from app.services.article_service import bulk_upsert_articles
 from app.ai.orchestrator import AIOrchestrator
 
@@ -15,15 +16,21 @@ router = APIRouter()
 
 @router.post("/scrape")
 async def scrape_articles(
-    source: str = Query("all", pattern="^(all|thehindu|indianexpress)$"),
+    source: str = Query("all", pattern="^(all|thehindu|indianexpress|pib)$"),
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(get_admin_user),
 ):
+    scraper_map = {
+        "thehindu": TheHinduScraper,
+        "indianexpress": IndianExpressScraper,
+        "pib": PibScraper,
+    }
     scrape_tasks = []
-    if source in ("all", "thehindu"):
-        scrape_tasks.append(TheHinduScraper().scrape())
-    if source in ("all", "indianexpress"):
-        scrape_tasks.append(IndianExpressScraper().scrape())
+    if source == "all":
+        for cls in scraper_map.values():
+            scrape_tasks.append(cls().scrape())
+    elif source in scraper_map:
+        scrape_tasks.append(scraper_map[source]().scrape())
 
     results = await asyncio.gather(*scrape_tasks, return_exceptions=True)
     all_articles = []

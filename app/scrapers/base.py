@@ -87,7 +87,7 @@ class BaseScraper(ABC):
         async def process_entry(entry: dict) -> ScrapedArticle | None:
             async with sem:
                 await asyncio.sleep(self.rate_limit_delay)
-                async with httpx.AsyncClient(timeout=30.0) as client:
+                async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
                     # Single fetch: extract og:image from same response
                     try:
                         resp = await client.get(

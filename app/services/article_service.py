@@ -19,6 +19,10 @@ def _parse_rss_date(date_str: str) -> datetime:
     try:
         return parsedate_to_datetime(date_str)
     except (ValueError, TypeError):
+        pass
+    try:
+        return datetime.fromisoformat(date_str.replace("+0000", "+00:00"))
+    except (ValueError, TypeError):
         return datetime.now()
 
 
@@ -218,6 +222,9 @@ async def get_article_counts(
     indianexpress_q = text(f"SELECT COUNT(*) FROM articles WHERE source = 'indianexpress' AND {date_filter}")
     indianexpress = (await db.execute(indianexpress_q)).scalar() or 0
 
+    pib_q = text(f"SELECT COUNT(*) FROM articles WHERE source = 'pib' AND {date_filter}")
+    pib = (await db.execute(pib_q)).scalar() or 0
+
     # Category counts
     source_filter = f"AND source = '{source}'" if source else ""
     cat_q = text(f"""
@@ -233,6 +240,7 @@ async def get_article_counts(
         "total": total,
         "thehindu": thehindu,
         "indianexpress": indianexpress,
+        "pib": pib,
         "categories": categories,
     }
 
