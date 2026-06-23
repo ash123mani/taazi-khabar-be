@@ -4,7 +4,7 @@ from email.utils import parsedate_to_datetime
 from uuid import UUID
 from typing import List, Tuple, Optional
 
-from sqlalchemy import select, cast, Date, func, or_
+from sqlalchemy import select, insert, cast, Date, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -63,17 +63,24 @@ async def bulk_upsert_articles(
     if not filtered_articles:
         return 0, skipped, errors, filtered_out
 
-    # Phase 2: batch insert
-    created_articles = []
-    for a in filtered_articles:
-        db_article = Article(
-            source=a.source, headline=a.headline, body_text=a.body_text,
-            url=a.url, published_at=_parse_rss_date(a.published_at),
-            image_url=a.image_url,
-        )
-        db.add(db_article)
-        created_articles.append((db_article, a))
+    # Phase 2: batch insert with ON CONFLICT DO NOTHING
+    # Prevents UniqueViolationError race between URL check and insert
+    stmt = insert(Article).values([
+        {
+            "source": a.source, "headline": a.headline, "body_text": a.body_text,
+            "url": a.url, "published_at": _parse_rss_date(a.published_at),
+            "image_url": a.image_url,
+        }
+        for a in filtered_articles
+    ]).on_conflict_do_nothing(constraint="articles_url_key")
+    await db.execute(stmt)
     await db.flush()
+
+    # Query back the successfully inserted articles for use in subsequent phases
+    urls = [a.url for a in filtered_articles]
+    result = await db.execute(select(Article).where(Article.url.in_(urls)))
+    art_map = {art.url: art for art in result.scalars().all()}
+    created_articles = [(art_map[a.url], a) for a in filtered_articles if a.url in art_map]
 
     # Phase 3: parallel summarize (no db passed — logging skipped for speed)
     async def summarize_one(a: ScrapedArticle) -> dict | None:
