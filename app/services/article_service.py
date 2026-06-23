@@ -4,7 +4,8 @@ from email.utils import parsedate_to_datetime
 from uuid import UUID
 from typing import List, Tuple, Optional
 
-from sqlalchemy import select, insert, cast, Date, func, or_
+from sqlalchemy import select, cast, Date, func, or_
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
