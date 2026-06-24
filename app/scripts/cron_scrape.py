@@ -163,7 +163,7 @@ async def run():
 
     t0 = time.time()
     async with async_session() as db:
-        created, skipped, summary_errors, filtered_out = await bulk_upsert_articles(
+        created, skipped, summary_errors, filtered_out, filtered_headlines = await bulk_upsert_articles(
             db=db,
             articles=all_articles,
             summarizer=summarize,
@@ -191,6 +191,12 @@ async def run():
     logger.info("  Articles filtered:  %d (not UPSC-relevant)", result["articles_filtered_out"])
     logger.info("  Questions generated for each article (via question_setter)")
     logger.info("  AI processing time: %.1fs", elapsed)
+
+    if filtered_headlines:
+        logger.info("")
+        logger.info("Articles filtered out (not UPSC-relevant): %d", len(filtered_headlines))
+        for h in filtered_headlines:
+            logger.info("  · %s", h[:120])
 
     if summary_errors:
         logger.warning("Summarization errors: %d", len(summary_errors))

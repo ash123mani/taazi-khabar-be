@@ -154,7 +154,7 @@ async def scrape_date(
             num_questions=3,
         )
 
-    created, skipped, summary_errors, filtered_out = await bulk_upsert_articles(
+    created, skipped, summary_errors, filtered_out, _ = await bulk_upsert_articles(
         db=db,
         articles=filtered,
         summarizer=summarize,

@@ -33,7 +33,7 @@ async def bulk_upsert_articles(
     summarizer=None,
     article_filter=None,
     question_setter=None,
-) -> Tuple[int, int, List[str], int]:
+) -> Tuple[int, int, List[str], int, List[str]]:
     urls = [a.url for a in articles]
     existing = await db.execute(select(Article.url).where(Article.url.in_(urls)))
     existing_urls = {row[0] for row in existing.fetchall()}
@@ -42,7 +42,7 @@ async def bulk_upsert_articles(
     skipped = len(articles) - len(new_articles)
 
     if not new_articles:
-        return 0, skipped, [], 0
+        return 0, skipped, [], 0, []
 
     sem = asyncio.Semaphore(5)
     errors: List[str] = []
@@ -60,9 +60,10 @@ async def bulk_upsert_articles(
     filter_results = await asyncio.gather(*[check_article(a) for a in new_articles])
     filtered_articles = [a for a, ok in zip(new_articles, filter_results) if ok]
     filtered_out = sum(1 for ok in filter_results if not ok)
+    filtered_headlines = [a.headline for a, ok in zip(new_articles, filter_results) if not ok]
 
     if not filtered_articles:
-        return 0, skipped, errors, filtered_out
+        return 0, skipped, errors, filtered_out, filtered_headlines
 
     # Phase 2: batch insert with ON CONFLICT DO NOTHING
     # Prevents UniqueViolationError race between URL check and insert
@@ -167,7 +168,7 @@ async def bulk_upsert_articles(
         await db.flush()
 
     await db.commit()
-    return created, skipped, errors, filtered_out
+    return created, skipped, errors, filtered_out, filtered_headlines
 
 
 async def list_articles(
