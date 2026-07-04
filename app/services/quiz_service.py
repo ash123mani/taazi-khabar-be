@@ -276,13 +276,12 @@ async def create_daily_quiz(
     article_date: DateType,
     category_id: Optional[UUID] = None,
 ) -> Quiz:
-    base_hash = compute_date_hash(article_date, category_id, user_id)
-    prefix = base_hash[:20]
+    title_prefix = f"Daily Quiz {article_date.isoformat()}"
 
     # Return existing unfinished quiz so user can continue
     existing_result = await db.execute(
         select(Quiz).where(
-            Quiz.article_set_hash.like(f"{prefix}%"),
+            Quiz.title.like(f"{title_prefix}%"),
             Quiz.user_id == user_id,
             Quiz.score.is_(None),
         ).order_by(Quiz.created_at.desc()).limit(1)
@@ -294,7 +293,7 @@ async def create_daily_quiz(
     # Count existing attempts to make a unique hash per retake
     count_result = await db.execute(
         select(func.count()).select_from(Quiz).where(
-            Quiz.article_set_hash.like(f"{prefix}%"),
+            Quiz.title.like(f"{title_prefix}%"),
             Quiz.user_id == user_id,
         )
     )
@@ -320,6 +319,6 @@ async def create_daily_quiz(
         article_set_hash=date_hash,
         articles=articles,
         questions_data=questions_data,
-        title=f"Daily Quiz {article_date.isoformat()}{cat_label}",
+        title=f"{title_prefix}{cat_label}",
     )
     return quiz
