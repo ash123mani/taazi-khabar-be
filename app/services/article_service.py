@@ -51,6 +51,8 @@ async def bulk_upsert_articles(
     async def check_article(a: ScrapedArticle) -> bool:
         if not article_filter:
             return True
+        if a.source == "pib":
+            return True
         async with sem:
             try:
                 return await article_filter(headline=a.headline, body_text=a.body_text)

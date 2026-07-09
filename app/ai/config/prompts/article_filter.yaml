@@ -17,7 +17,19 @@ prompt_template: |-
   - Disasters & events of national significance
 
   Articles that are purely local/city news, celebrity gossip, sports scores, entertainment,
-  or opinion pieces without analytical depth are NOT relevant for UPSC.
+  opinion pieces without analytical depth, crime reports (theft, assault, accidents) without
+  national policy implications, or temple/mosque/church specific local incidents are NOT
+  relevant for UPSC.
+
+  Examples of NOT relevant: "Who stole from Ram Temple's donation boxes? The SIT report,
+  explained" — this is a local crime incident, not UPSC-relevant. "UAPA case: Raids
+  carried out in Jammu and Kashmir's Baramulla" — local raid, not UPSC-relevant. "3,000
+  LPG cylinders swept into Maharashtra river after heavy rain floods gas plant" — local
+  accident without national policy implications, not UPSC-relevant. "Jharkhand CID arrests
+  prime accused in Bokaro forest land scam from Patna" — local crime, not UPSC-relevant.
+  "Wayanad landslide survivors recall terrifying escape: 'Massive mud wave chased us'" —
+  personal survival story, not UPSC-relevant. "Local man wins marathon" — sports, not
+  relevant.
 
   Article headline: {headline}
   Article body (first 500 chars): {body_preview}
