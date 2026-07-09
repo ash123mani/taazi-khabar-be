@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Taazi Khabar — HLD Architecture Diagram</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    background: #0a0f1e;
+    color: #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem;
+    min-height: 100vh;
+  }
+  h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #f8fafc;
+    margin-bottom: 0.25rem;
+    letter-spacing: -0.02em;
+  }
+  h1 span { color: #22d3ee; }
+  .subtitle {
+    font-size: 0.9rem;
+    color: #64748b;
+    margin-bottom: 2rem;
+    text-align: center;
+  }
+  .subtitle strong { color: #6ee7b7; }
+
+  .diagram-wrapper {
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 16px;
+    padding: 2rem;
+    max-width: 1100px;
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  svg {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .legend {
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+    margin-top: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: #94a3b8;
+  }
+  .legend-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    border: 1px solid #334155;
+  }
+
+  .note {
+    background: #1e293b;
+    border-left: 3px solid #059669;
+    padding: 0.75rem 1rem;
+    margin-top: 1.5rem;
+    font-size: 0.8rem;
+    color: #94a3b8;
+    border-radius: 0 8px 8px 0;
+    max-width: 1100px;
+    width: 100%;
+  }
+  .note strong { color: #6ee7b7; }
+</style>
+</head>
+<body>
+
+<h1>Taazi <span>Khabar</span></h1>
+<div class="subtitle">High-Level Architecture Diagram — <strong>Zero Cost</strong> | UPSC Current Affairs AI Platform</div>
+
+<div class="diagram-wrapper">
+<svg viewBox="0 0 1000 750" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono', 'Fira Code', monospace">
+
+  <!-- ===== DEFINITIONS ===== -->
+  <defs>
+    <filter id="glow">
+      <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#22d3ee" flood-opacity="0.15"/>
+    </filter>
+    <filter id="glow-purple">
+      <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#a78bfa" flood-opacity="0.15"/>
+    </filter>
+    <filter id="glow-green">
+      <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#059669" flood-opacity="0.15"/>
+    </filter>
+
+    <marker id="arrow-cyan" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee"/>
+    </marker>
+    <marker id="arrow-gray" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#475569"/>
+    </marker>
+    <marker id="arrow-purple" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#a78bfa"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#059669"/>
+    </marker>
+    <marker id="arrow-amber" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f59e0b"/>
+    </marker>
+
+    <linearGradient id="grad-frontend" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#164e63"/>
+      <stop offset="100%" stop-color="#0e3a47"/>
+    </linearGradient>
+    <linearGradient id="grad-api" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#312e81"/>
+      <stop offset="100%" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="grad-ai" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4c1d95"/>
+      <stop offset="100%" stop-color="#2e1065"/>
+    </linearGradient>
+    <linearGradient id="grad-data" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#064e3b"/>
+      <stop offset="100%" stop-color="#022c22"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ===== BACKGROUND GRID ===== -->
+  <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+    <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+  </pattern>
+  <rect width="1000" height="750" fill="url(#grid)" opacity="0.4"/>
+
+  <!-- ===== LAYER LABELS ===== -->
+  <text x="15" y="28" fill="#475569" font-size="10" font-weight="700" letter-spacing="2" text-anchor="start">PRESENTATION</text>
+  <line x1="15" y1="32" x2="180" y2="32" stroke="#475569" stroke-width="1" opacity="0.5"/>
+
+  <text x="15" y="178" fill="#475569" font-size="10" font-weight="700" letter-spacing="2" text-anchor="start">API LAYER</text>
+  <line x1="15" y1="182" x2="155" y2="182" stroke="#475569" stroke-width="1" opacity="0.5"/>
+
+  <text x="15" y="368" fill="#475569" font-size="10" font-weight="700" letter-spacing="2" text-anchor="start">AI ORCHESTRATOR</text>
+  <line x1="15" y1="372" x2="200" y2="372" stroke="#475569" stroke-width="1" opacity="0.5"/>
+
+  <text x="15" y="590" fill="#475569" font-size="10" font-weight="700" letter-spacing="2" text-anchor="start">DATA</text>
+  <line x1="15" y1="594" x2="105" y2="594" stroke="#475569" stroke-width="1" opacity="0.5"/>
+
+  <!-- ============================================================ -->
+  <!-- ===== LAYER 1: PRESENTATION ===== -->
+  <!-- ============================================================ -->
+
+  <!-- User Icon -->
+  <rect x="50" y="50" width="160" height="70" rx="10" fill="url(#grad-frontend)" stroke="#22d3ee" stroke-width="1.5" filter="url(#glow)"/>
+  <text x="130" y="78" fill="#22d3ee" font-size="13" font-weight="700" text-anchor="middle">Frontend</text>
+  <text x="130" y="94" fill="#94a3b8" font-size="9" text-anchor="middle">Next.js 14 + Tailwind</text>
+  <text x="130" y="108" fill="#64748b" font-size="8" text-anchor="middle">Vercel Free Tier</text>
+
+  <!-- FE sub-boxes -->
+  <rect x="240" y="45" width="110" height="34" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="295" y="66" fill="#cbd5e1" font-size="9" text-anchor="middle">News Feed</text>
+  <rect x="240" y="84" width="110" height="34" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="295" y="105" fill="#cbd5e1" font-size="9" text-anchor="middle">Quiz Center</text>
+
+  <rect x="365" y="45" width="110" height="34" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="420" y="66" fill="#cbd5e1" font-size="9" text-anchor="middle">History</text>
+  <rect x="365" y="84" width="110" height="34" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="420" y="105" fill="#cbd5e1" font-size="9" text-anchor="middle">Admin Panel</text>
+
+  <!-- Auth box -->
+  <rect x="505" y="50" width="140" height="70" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="575" y="78" fill="#f59e0b" font-size="13" font-weight="700" text-anchor="middle">Auth</text>
+  <text x="575" y="94" fill="#94a3b8" font-size="9" text-anchor="middle">NextAuth.js</text>
+  <text x="575" y="108" fill="#64748b" font-size="8" text-anchor="middle">Google + Email</text>
+
+  <!-- ============================================================ -->
+  <!-- ===== ARROW: Frontend → API ===== -->
+  <!-- ============================================================ -->
+  <line x1="130" y1="120" x2="130" y2="170" stroke="#475569" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrow-gray)"/>
+  <text x="145" y="148" fill="#475569" font-size="8">HTTP Requests</text>
+
+  <!-- ============================================================ -->
+  <!-- ===== LAYER 2: API LAYER ===== -->
+  <!-- ============================================================ -->
+
+  <rect x="50" y="175" width="180" height="70" rx="10" fill="url(#grad-api)" stroke="#818cf8" stroke-width="1.5" filter="url(#glow-purple)"/>
+  <text x="140" y="203" fill="#818cf8" font-size="13" font-weight="700" text-anchor="middle">Backend API</text>
+  <text x="140" y="219" fill="#94a3b8" font-size="9" text-anchor="middle">FastAPI (Python)</text>
+  <text x="140" y="233" fill="#64748b" font-size="8" text-anchor="middle">Render Free Tier</text>
+
+  <!-- API sub-services -->
+  <rect x="260" y="180" width="85" height="30" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="302" y="199" fill="#cbd5e1" font-size="8" text-anchor="middle">Article Service</text>
+  <rect x="260" y="214" width="85" height="30" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="302" y="233" fill="#cbd5e1" font-size="8" text-anchor="middle">Quiz Service</text>
+
+  <rect x="360" y="180" width="85" height="30" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="402" y="199" fill="#cbd5e1" font-size="8" text-anchor="middle">User Service</text>
+  <rect x="360" y="214" width="85" height="30" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="402" y="233" fill="#cbd5e1" font-size="8" text-anchor="middle">Training Service</text>
+
+  <!-- Cron box -->
+  <rect x="475" y="180" width="100" height="64" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="525" y="202" fill="#f59e0b" font-size="10" font-weight="700" text-anchor="middle">Scraper Cron</text>
+  <text x="525" y="216" fill="#94a3b8" font-size="8" text-anchor="middle">Celery Beat</text>
+  <text x="525" y="230" fill="#64748b" font-size="7" text-anchor="middle">Daily RSS Fetch</text>
+
+  <!-- ============================================================ -->
+  <!-- ===== ARROW: API → AI ===== -->
+  <!-- ============================================================ -->
+  <line x1="140" y1="245" x2="140" y2="310" stroke="#475569" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrow-gray)"/>
+  <text x="155" y="280" fill="#475569" font-size="8">AI Orchestrator</text>
+
+  <!-- ============================================================ -->
+  <!-- ===== LAYER 3: AI ORCHESTRATOR ===== -->
+  <!-- ============================================================ -->
+
+  <!-- Orchestrator box -->
+  <rect x="50" y="315" width="180" height="65" rx="10" fill="url(#grad-ai)" stroke="#a78bfa" stroke-width="2" filter="url(#glow-purple)"/>
+  <text x="140" y="340" fill="#a78bfa" font-size="13" font-weight="700" text-anchor="middle">AI Orchestrator</text>
+  <text x="140" y="356" fill="#94a3b8" font-size="8" text-anchor="middle">Model Registry → Routes to Persona</text>
+  <text x="140" y="369" fill="#64748b" font-size="7" text-anchor="middle">Training Data Collector (auto-log)</text>
+
+  <!-- Two Personas -->
+  <rect x="260" y="308" width="150" height="80" rx="10" fill="#164e63" stroke="#22d3ee" stroke-width="2"/>
+  <rect x="270" y="312" width="40" height="14" rx="4" fill="#22d3ee"/>
+  <text x="290" y="323" fill="#0f172a" font-size="7" font-weight="700" text-anchor="middle">LoRA</text>
+  <text x="335" y="323" fill="#22d3ee" font-size="8" font-weight="600" text-anchor="middle">summary-v1</text>
+  <text x="335" y="340" fill="#f8fafc" font-size="11" font-weight="700" text-anchor="middle">GK Summarizer</text>
+  <text x="335" y="356" fill="#94a3b8" font-size="7" text-anchor="middle">Article → GK Gist + Tags</text>
+  <text x="335" y="370" fill="#64748b" font-size="7" text-anchor="middle">Trained: UPSC papers</text>
+
+  <rect x="430" y="308" width="150" height="80" rx="10" fill="#2e1065" stroke="#a78bfa" stroke-width="2"/>
+  <rect x="440" y="312" width="40" height="14" rx="4" fill="#a78bfa"/>
+  <text x="460" y="323" fill="#0f172a" font-size="7" font-weight="700" text-anchor="middle">LoRA</text>
+  <text x="505" y="323" fill="#a78bfa" font-size="8" font-weight="600" text-anchor="middle">quizzer-v1</text>
+  <text x="505" y="340" fill="#f8fafc" font-size="11" font-weight="700" text-anchor="middle">Question Setter</text>
+  <text x="505" y="356" fill="#94a3b8" font-size="7" text-anchor="middle">Articles → UPSC MCQs</text>
+  <text x="505" y="370" fill="#64748b" font-size="7" text-anchor="middle">Trained: Prelims papers</text>
+
+  <!-- ============================================================ -->
+  <!-- ===== ARROWS: Orchestrator → Personas ===== -->
+  <!-- ============================================================ -->
+  <line x1="230" y1="335" x2="258" y2="340" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow-gray)"/>
+  <line x1="410" y1="340" x2="428" y2="340" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow-gray)"/>
+
+  <!-- ============================================================ -->
+  <!-- ===== ARROWS: Personas → NVIDIA NIM ===== -->
+  <!-- ============================================================ -->
+  <path d="M 335 388 L 335 420 L 620 420 L 620 400" fill="none" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+  <path d="M 505 388 L 505 420 L 620 420 L 620 400" fill="none" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow-purple)"/>
+
+  <!-- ============================================================ -->
+  <!-- ===== NVIDIA NIM (right side) ===== -->
+  <!-- ============================================================ -->
+  <rect x="560" y="315" width="170" height="80" rx="10" fill="#1e293b" stroke="#22d3ee" stroke-width="1.5" filter="url(#glow)"/>
+  <text x="645" y="343" fill="#22d3ee" font-size="13" font-weight="700" text-anchor="middle">NVIDIA NIM</text>
+  <text x="645" y="359" fill="#94a3b8" font-size="8" text-anchor="middle">Llama 3.1 8B Instruct</text>
+  <text x="645" y="373" fill="#64748b" font-size="8" text-anchor="middle">Free Tier API</text>
+  <text x="645" y="387" fill="#6ee7b7" font-size="7" text-anchor="middle">~1000 req/day free</text>
+
+  <!-- ============================================================ -->
+  <!-- ===== ARROW: AI → DATA ===== -->
+  <!-- ============================================================ -->
+  <line x1="140" y1="380" x2="140" y2="430" stroke="#475569" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrow-gray)"/>
+  <text x="155" y="410" fill="#475569" font-size="8">Save & Log</text>
+
+  <!-- ============================================================ -->
+  <!-- ===== LAYER 4: DATA LAYER ===== -->
+  <!-- ============================================================ -->
+
+  <!-- PostgreSQL -->
+  <rect x="50" y="435" width="220" height="80" rx="12" fill="url(#grad-data)" stroke="#059669" stroke-width="2" filter="url(#glow-green)"/>
+  <text x="160" y="463" fill="#059669" font-size="14" font-weight="700" text-anchor="middle">PostgreSQL + pgvector</text>
+  <text x="160" y="480" fill="#94a3b8" font-size="8" text-anchor="middle">Supabase Free Tier (500MB)</text>
+  <text x="160" y="495" fill="#64748b" font-size="7" text-anchor="middle">Users | Articles | Quizzes</text>
+  <text x="160" y="508" fill="#64748b" font-size="7" text-anchor="middle">AI Interactions | Exam Questions</text>
+
+  <!-- DB sub-tables as small boxes -->
+  <rect x="295" y="440" width="72" height="22" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="331" y="455" fill="#cbd5e1" font-size="7" text-anchor="middle">Users</text>
+  <rect x="295" y="466" width="72" height="22" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="331" y="481" fill="#cbd5e1" font-size="7" text-anchor="middle">Articles</text>
+  <rect x="295" y="492" width="72" height="22" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="331" y="507" fill="#cbd5e1" font-size="7" text-anchor="middle">Quizzes</text>
+
+  <rect x="380" y="440" width="72" height="22" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="416" y="455" fill="#cbd5e1" font-size="7" text-anchor="middle">Questions</text>
+  <rect x="380" y="466" width="72" height="22" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="416" y="481" fill="#cbd5e1" font-size="7" text-anchor="middle">AI Interactions</text>
+  <rect x="380" y="492" width="72" height="22" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="416" y="507" fill="#cbd5e1" font-size="7" text-anchor="middle">Exam Questions</text>
+
+  <!-- Redis -->
+  <rect x="480" y="435" width="120" height="80" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="540" y="463" fill="#f59e0b" font-size="11" font-weight="700" text-anchor="middle">Redis</text>
+  <text x="540" y="480" fill="#94a3b8" font-size="8" text-anchor="middle">Upstash Free</text>
+  <text x="540" y="495" fill="#64748b" font-size="7" text-anchor="middle">Cache + Sessions</text>
+  <text x="540" y="508" fill="#64748b" font-size="7" text-anchor="middle">Task Queue</text>
+
+  <!-- ============================================================ -->
+  <!-- ===== BOTTOM: FINE-TUNING & EXTERNAL ===== -->
+  <!-- ============================================================ -->
+
+  <!-- Colab -->
+  <rect x="50" y="560" width="170" height="65" rx="10" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="135" y="586" fill="#a78bfa" font-size="12" font-weight="700" text-anchor="middle">Google Colab</text>
+  <text x="135" y="602" fill="#94a3b8" font-size="8" text-anchor="middle">T4 GPU Fine-Tuning</text>
+  <text x="135" y="616" fill="#64748b" font-size="7" text-anchor="middle">QLoRA 4-bit Training</text>
+
+  <!-- Arrow: Colab → HF Hub -->
+  <line x1="220" y1="592" x2="280" y2="592" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-purple)"/>
+
+  <!-- HuggingFace -->
+  <rect x="285" y="560" width="150" height="65" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="360" y="586" fill="#f59e0b" font-size="12" font-weight="700" text-anchor="middle">HuggingFace Hub</text>
+  <text x="360" y="602" fill="#94a3b8" font-size="8" text-anchor="middle">LoRA Adapter Storage</text>
+  <text x="360" y="616" fill="#64748b" font-size="7" text-anchor="middle">Free, Public Repos</text>
+
+  <!-- Arrow: HF → Admin -->
+  <path d="M 435 592 L 530 592 L 530 560" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-amber)"/>
+
+  <!-- Data Sources (top right) -->
+  <rect x="620" y="45" width="150" height="45" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="695" y="63" fill="#f8fafc" font-size="10" font-weight="700" text-anchor="middle">Data Sources</text>
+  <text x="695" y="78" fill="#94a3b8" font-size="8" text-anchor="middle">The Hindu + Indian Express</text>
+
+  <!-- Arrow: Data Sources → Scraper -->
+  <path d="M 695 90 L 695 140 L 525 140 L 525 178" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow-gray)"/>
+  <text x="610" y="135" fill="#475569" font-size="7">RSS Feeds</text>
+
+  <!-- ============================================================ -->
+  <!-- ===== ARROWS: Data ←→ API ===== -->
+  <!-- ============================================================ -->
+  <line x1="160" y1="435" x2="160" y2="245" stroke="#059669" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-green)"/>
+  <text x="178" y="340" fill="#059669" font-size="7">Read/Write</text>
+
+  <!-- ============================================================ -->
+  <!-- ===== ARROWS: Cron → Scraper Flow ===== -->
+  <!-- ============================================================ -->
+
+  <!-- ============================================================ -->
+  <!-- ===== FINE-TUNING LOOP (dashed boundary) ===== -->
+  <!-- ============================================================ -->
+  <rect x="30" y="545" width="420" height="95" rx="12" fill="none" stroke="#a78bfa" stroke-width="1" stroke-dasharray="6,4" opacity="0.4"/>
+  <text x="45" y="560" fill="#a78bfa" font-size="7" opacity="0.6">FINE-TUNING PIPELINE (Admin Triggered)</text>
+
+  <!-- Arrow: Collect → Colab flow -->
+  <text x="140" y="440" fill="#64748b" font-size="7" text-anchor="end" transform="rotate(-90, 140, 435)">Collects training data</text>
+
+  <!-- ============================================================ -->
+  <!-- ===== ICONS / BADGES ===== -->
+  <!-- ============================================================ -->
+
+  <!-- Zero Cost badges -->
+  <rect x="52" y="52" width="50" height="14" rx="4" fill="#059669" opacity="0.9"/>
+  <text x="77" y="63" fill="#fff" font-size="7" font-weight="700" text-anchor="middle">$0</text>
+
+  <rect x="52" y="177" width="50" height="14" rx="4" fill="#059669" opacity="0.9"/>
+  <text x="77" y="188" fill="#fff" font-size="7" font-weight="700" text-anchor="middle">$0</text>
+
+  <rect x="562" y="317" width="50" height="14" rx="4" fill="#059669" opacity="0.9"/>
+  <text x="587" y="328" fill="#fff" font-size="7" font-weight="700" text-anchor="middle">$0</text>
+
+  <rect x="52" y="437" width="50" height="14" rx="4" fill="#059669" opacity="0.9"/>
+  <text x="77" y="448" fill="#fff" font-size="7" font-weight="700" text-anchor="middle">$0</text>
+
+  <rect x="482" y="437" width="50" height="14" rx="4" fill="#059669" opacity="0.9"/>
+  <text x="507" y="448" fill="#fff" font-size="7" font-weight="700" text-anchor="middle">$0</text>
+
+  <!-- Quiz Cache Flow Box -->
+  <rect x="620" y="170" width="210" height="105" rx="8" fill="#0f172a" stroke="#059669" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="725" y="190" fill="#6ee7b7" font-size="9" font-weight="700" text-anchor="middle">Quiz Caching (article_set_hash)</text>
+  <text x="640" y="207" fill="#94a3b8" font-size="7">Hash = MD5(sorted(article_ids))</text>
+  <text x="640" y="221" fill="#94a3b8" font-size="7">IF quiz exists with same hash:</text>
+  <text x="650" y="235" fill="#6ee7b7" font-size="7">Return from DB (zero LLM cost)</text>
+  <text x="640" y="249" fill="#94a3b8" font-size="7">ELSE: Call LLM + save with hash</text>
+  <text x="640" y="263" fill="#64748b" font-size="7">UNIQUE constraint on hash column</text>
+
+  <line x1="620" y1="222" x2="600" y2="222" stroke="#059669" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrow-green)"/>
+
+  <!-- Data flow arrows -->
+  <text x="850" y="100" fill="#475569" font-size="8" text-anchor="end">Model Registry Config</text>
+  <rect x="700" y="108" width="200" height="50" rx="6" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+  <text x="800" y="126" fill="#22d3ee" font-size="7" text-anchor="middle">models.yaml</text>
+  <text x="800" y="140" fill="#64748b" font-size="7" text-anchor="middle">summarizer: nim (llama)</text>
+  <text x="800" y="152" fill="#64748b" font-size="7" text-anchor="middle">question_setter: nim (llama)</text>
+
+  <line x1="700" y1="133" x2="620" y2="133" stroke="#475569" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrow-gray)"/>
+
+  <!-- Legend in top right -->
+  <rect x="740" y="300" width="200" height="110" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+  <text x="840" y="318" fill="#64748b" font-size="8" font-weight="700" text-anchor="middle">COLOR LEGEND</text>
+  <rect x="755" y="330" width="10" height="10" rx="2" fill="#22d3ee"/>
+  <text x="775" y="339" fill="#94a3b8" font-size="7">Frontend / UI</text>
+  <rect x="755" y="348" width="10" height="10" rx="2" fill="#818cf8"/>
+  <text x="775" y="357" fill="#94a3b8" font-size="7">Backend / API</text>
+  <rect x="755" y="366" width="10" height="10" rx="2" fill="#a78bfa"/>
+  <text x="775" y="375" fill="#94a3b8" font-size="7">AI / ML Layer</text>
+  <rect x="755" y="384" width="10" height="10" rx="2" fill="#059669"/>
+  <text x="775" y="393" fill="#94a3b8" font-size="7">Data / Storage</text>
+
+</svg>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch" style="background:#164e63;"></div> Frontend (Vercel Free)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#312e81;"></div> API Layer (Render Free)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#4c1d95;"></div> AI Layer (NVIDIA NIM Free)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#064e3b;"></div> Data Layer (Supabase Free)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#1e293b; border-color:#a78bfa;"></div> Fine-Tuning (Colab Free)</div>
+</div>
+
+<div class="note">
+  <strong>Zero Cost Guarantee:</strong> Every component runs on a free tier. Total monthly cost: <strong>$0.00</strong>.
+  Upgrade only when you exceed: Vercel 100GB bandwidth, Supabase 500MB DB, or NVIDIA 1000 req/day.
+</div>
+
+</body>
+</html>

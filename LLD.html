@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Taazi Khabar — Low-Level Design</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 2rem; }
+  h1 { font-size: 2.5rem; font-weight: 800; color: #f8fafc; margin-bottom: 0.25rem; }
+  h1 span { color: #a78bfa; }
+  .subtitle { color: #94a3b8; font-size: 1.1rem; margin-bottom: 2rem; }
+  h2 { font-size: 1.5rem; font-weight: 700; color: #f8fafc; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+  h3 { font-size: 1.15rem; font-weight: 600; color: #cbd5e1; margin: 1.5rem 0 0.75rem; }
+  h4 { font-size: 0.95rem; font-weight: 600; color: #94a3b8; margin: 1rem 0 0.5rem; }
+  .card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 1.25rem; margin: 0.75rem 0; }
+  .card h4 { margin-top: 0; }
+
+  table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; font-size: 0.82rem; }
+  th { text-align: left; padding: 0.5rem 0.75rem; background: #0f172a; color: #94a3b8; font-weight: 600; border-bottom: 2px solid #334155; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  td { padding: 0.45rem 0.75rem; border-bottom: 1px solid #1e293b; color: #cbd5e1; font-family: monospace; font-size: 0.78rem; }
+  tr:hover td { background: #1e293b; }
+  .pk { color: #22d3ee; font-weight: 700; }
+  .fk { color: #a78bfa; }
+  .req { color: #f87171; }
+  .opt { color: #64748b; }
+
+  .folder { font-family: monospace; font-size: 0.8rem; line-height: 1.7; }
+  .folder .d { color: #22d3ee; }
+  .folder .f { color: #cbd5e1; }
+  .folder .cm { color: #64748b; font-style: italic; }
+  .indent-0 { padding-left: 0; }
+  .indent-1 { padding-left: 1.5rem; }
+  .indent-2 { padding-left: 3rem; }
+  .indent-3 { padding-left: 4.5rem; }
+  .indent-4 { padding-left: 6rem; }
+  .indent-5 { padding-left: 7.5rem; }
+  .indent-6 { padding-left: 9rem; }
+
+  pre { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 1rem; overflow-x: auto; font-size: 0.78rem; line-height: 1.5; color: #e2e8f0; margin: 0.5rem 0; }
+  .cm { color: #64748b; font-style: italic; }
+
+  .seq { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 1.5rem; font-family: monospace; font-size: 0.78rem; line-height: 1.6; overflow-x: auto; margin: 0.75rem 0; }
+  .seq .a { color: #22d3ee; font-weight: 700; }
+  .seq .arr { color: #64748b; }
+  .seq .req { color: #f8fafc; }
+  .seq .res { color: #a78bfa; }
+  .seq .nt { color: #f59e0b; font-style: italic; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1rem 0; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; margin: 1rem 0; }
+  @media (max-width: 768px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+  ul { list-style: none; margin: 0.5rem 0; }
+  li { padding: 0.25rem 0; font-size: 0.85rem; color: #cbd5e1; }
+  li::before { content: "> "; color: #a78bfa; }
+  code { background: #0f172a; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.8rem; color: #22d3ee; }
+</style>
+</head>
+<body>
+
+<h1>Taazi <span>Khabar</span></h1>
+<div class="subtitle">Low-Level Design — Database Schema, API Specs, Components, Sequences & Config</div>
+
+<!-- ===== 1. PROJECT STRUCTURE ===== -->
+<h2>1. Project Structure</h2>
+<div class="card">
+<div class="folder">
+<div class="d indent-0">taazi-khabar/</div>
+<div class="f indent-1">docker-compose.yml</div>
+<div class="f indent-1">.env.example</div>
+<div class="f indent-1">Makefile</div>
+<div class="f indent-1">README.md</div>
+<div class="f indent-1">HLD.html</div>
+<div class="f indent-1">LLD.html</div>
+<div class="d indent-1">frontend/</div>
+<div class="f indent-2">package.json</div>
+<div class="f indent-2">next.config.js</div>
+<div class="f indent-2">tailwind.config.ts</div>
+<div class="d indent-2">src/</div>
+<div class="d indent-3">app/</div>
+<div class="f indent-4">layout.tsx</div>
+<div class="f indent-4">page.tsx <span class="cm">// News Feed</span></div>
+<div class="d indent-4">(auth)/</div>
+<div class="f indent-4">login/page.tsx</div>
+<div class="f indent-4">register/page.tsx</div>
+<div class="d indent-4">quiz/</div>
+<div class="f indent-4">page.tsx <span class="cm">// Article selector</span></div>
+<div class="f indent-4">[id]/page.tsx <span class="cm">// Take quiz</span></div>
+<div class="d indent-4">history/</div>
+<div class="f indent-4">page.tsx</div>
+<div class="f indent-4">[id]/page.tsx</div>
+<div class="d indent-4">admin/</div>
+<div class="f indent-4">page.tsx</div>
+<div class="f indent-4">training-data/page.tsx</div>
+<div class="f indent-4">datasets/page.tsx</div>
+<div class="f indent-4">models/page.tsx</div>
+<div class="d indent-3">components/</div>
+<div class="f indent-4">Navbar.tsx</div>
+<div class="f indent-4">ArticleCard.tsx</div>
+<div class="f indent-4">ArticleSelector.tsx</div>
+<div class="f indent-4">SyllabusTag.tsx</div>
+<div class="f indent-4">QuizQuestion.tsx</div>
+<div class="f indent-4">QuizResult.tsx</div>
+<div class="f indent-4">HistoryCard.tsx</div>
+<div class="f indent-4">TrainingDataTable.tsx</div>
+<div class="d indent-3">lib/</div>
+<div class="f indent-4">api.ts <span class="cm">// API client</span></div>
+<div class="f indent-4">auth.ts <span class="cm">// NextAuth config</span></div>
+<div class="f indent-4">types.ts</div>
+<div class="f indent-4">utils.ts</div>
+<div class="d indent-1">backend/</div>
+<div class="f indent-2">pyproject.toml</div>
+<div class="f indent-2">Dockerfile</div>
+<div class="d indent-2">app/</div>
+<div class="f indent-3">main.py <span class="cm">// FastAPI app</span></div>
+<div class="f indent-3">config.py <span class="cm">// Settings</span></div>
+<div class="f indent-3">deps.py <span class="cm">// Dependencies</span></div>
+<div class="d indent-3">api/</div>
+<div class="f indent-4">__init__.py</div>
+<div class="f indent-4">auth.py</div>
+<div class="f indent-4">articles.py</div>
+<div class="f indent-4">quizzes.py</div>
+<div class="f indent-4">history.py</div>
+<div class="f indent-4">admin.py</div>
+<div class="d indent-3">models/ <span class="cm">// SQLAlchemy</span></div>
+<div class="f indent-4">user.py</div>
+<div class="f indent-4">article.py</div>
+<div class="f indent-4">category.py</div>
+<div class="f indent-4">quiz.py</div>
+<div class="f indent-4">ai_interaction.py</div>
+<div class="f indent-4">training_dataset.py</div>
+<div class="f indent-4">exam_question.py</div>
+<div class="d indent-3">schemas/ <span class="cm">// Pydantic</span></div>
+<div class="f indent-4">user.py</div>
+<div class="f indent-4">article.py</div>
+<div class="f indent-4">quiz.py</div>
+<div class="d indent-3">services/</div>
+<div class="f indent-4">user_service.py</div>
+<div class="f indent-4">article_service.py</div>
+<div class="f indent-4">quiz_service.py</div>
+<div class="f indent-4">training_service.py</div>
+<div class="d indent-3">ai/</div>
+<div class="f indent-4">__init__.py</div>
+<div class="f indent-4">orchestrator.py <span class="cm">// Routes to persona</span></div>
+<div class="f indent-4">model_registry.py <span class="cm">// Reads YAML</span></div>
+<div class="d indent-4">providers/</div>
+<div class="f indent-5">base.py <span class="cm">// Abstract</span></div>
+<div class="f indent-5">nim.py <span class="cm">// NVIDIA NIM</span></div>
+<div class="d indent-4">personas/</div>
+<div class="f indent-5">summarizer.py <span class="cm">// Prompts + parsing</span></div>
+<div class="f indent-5">question_setter.py <span class="cm">// Prompts + parsing</span></div>
+<div class="d indent-4">training/</div>
+<div class="f indent-5">collector.py <span class="cm">// Auto-logger</span></div>
+<div class="f indent-5">dataset_builder.py <span class="cm">// Alpaca format</span></div>
+<div class="d indent-4">config/</div>
+<div class="f indent-5">models.yaml</div>
+<div class="d indent-5">prompts/</div>
+<div class="f indent-6">summarizer.yaml</div>
+<div class="f indent-6">question_setter.yaml</div>
+<div class="d indent-3">scrapers/</div>
+<div class="f indent-4">base.py</div>
+<div class="f indent-4">the_hindu.py</div>
+<div class="f indent-4">indian_express.py</div>
+<div class="d indent-2">alembic/</div>
+<div class="f indent-3">env.py</div>
+<div class="f indent-3">versions/</div>
+<div class="d indent-1">notebooks/ <span class="cm">// Colab fine-tuning</span></div>
+<div class="f indent-2">fine_tune_summarizer.ipynb</div>
+<div class="f indent-2">fine_tune_question_setter.ipynb</div>
+</div>
+</div>
+
+<!-- ===== 2. DATABASE SCHEMA ===== -->
+<h2>2. Database Schema (PostgreSQL + pgvector)</h2>
+
+<h3>2.1 users</h3>
+<table>
+  <tr><th>Column</th><th>Type</th><th>Constraints</th></tr>
+  <tr><td>id</td><td>UUID</td><td><span class="pk">PK</span></td></tr>
+  <tr><td>email</td><td>VARCHAR(255)</td><td><span class="req">UNIQUE NOT NULL</span></td></tr>
+  <tr><td>password_hash</td><td>VARCHAR(255)</td><td><span class="req">NOT NULL</span></td></tr>
+  <tr><td>name</td><td>VARCHAR(100)</td><td>NULL</td></tr>
+  <tr><td>is_admin</td><td>BOOLEAN</td><td>DEFAULT false</td></tr>
+  <tr><td>created_at</td><td>TIMESTAMPTZ</td><td>DEFAULT now()</td></tr>
+</table>
+
+<h3>2.2 articles</h3>
+<table>
+  <tr><th>Column</th><th>Type</th><th>Constraints</th></tr>
+  <tr><td>id</td><td>UUID</td><td><span class="pk">PK</span></td></tr>
+  <tr><td>source</td><td>VARCHAR(50)</td><td><span class="req">NOT NULL</span> ('the_hindu'|'indian_express')</td></tr>
+  <tr><td>headline</td><td>TEXT</td><td><span class="req">NOT NULL</span></td></tr>
+  <tr><td>body_text</td><td>TEXT</td><td><span class="req">NOT NULL</span></td></tr>
+  <tr><td>url</td><td>TEXT</td><td><span class="req">UNIQUE NOT NULL</span></td></tr>
+  <tr><td>published_at</td><td>TIMESTAMPTZ</td><td><span class="req">NOT NULL</span></td></tr>
+  <tr><td>scraped_at</td><td>TIMESTAMPTZ</td><td>DEFAULT now()</td></tr>
+  <tr><td>gk_summary</td><td>TEXT</td><td>NULL (populated by AI)</td></tr>
+  <tr><td>key_terms</td><td>TEXT[]</td><td>NULL</td></tr>
+  <tr><td>syllabus_tag</td><td>VARCHAR(200)</td><td>NULL (e.g. 'Polity > Parliament')</td></tr>
+  <tr><td>category_id</td><td>UUID</td><td><span class="fk">FK -> categories.id</span> NULL</td></tr>
+  <tr><td>embedding</td><td>VECTOR(768)</td><td>NULL (for semantic search)</td></tr>
+</table>
+
+<h3>2.3 categories (UPSC Syllabus Tree)</h3>
+<table>
+  <tr><th>Column</th><th>Type</th><th>Constraints</th></tr>
+  <tr><td>id</td><td>UUID</td><td><span class="pk">PK</span></td></tr>
+  <tr><td>name</td><td>VARCHAR(200)</td><td><span class="req">NOT NULL</span></td></tr>
+  <tr><td>parent_id</td><td>UUID</td><td><span class="fk">FK -> categories.id</span> NULL</td></tr>
+  <tr><td>level</td><td>INT</td><td>1=subject, 2=topic, 3=subtopic</td></tr>
+  <tr><td>syllabus_code</td><td>VARCHAR(50)</td><td>NULL (official UPSC code)</td></tr>
+</table>
+
+<h3>2.4 quizzes (with article-set caching)</h3>
+<table>
+  <tr><th>Column</th><th>Type</th><th>Constraints</th></tr>
+  <tr><td>id</td><td>UUID</td><td><span class="pk">PK</span></td></tr>
+  <tr><td>user_id</td><td>UUID</td><td><span class="fk">FK -> users.id</span> <span class="req">NOT NULL</span></td></tr>
+  <tr><td>title</td><td>VARCHAR(200)</td><td>NULL</td></tr>
+  <tr><td>article_set_hash</td><td>VARCHAR(32)</td><td><span class="req">UNIQUE NOT NULL</span> (MD5 of sorted article IDs)</td></tr>
+  <tr><td>score</td><td>INT</td><td>NULL (filled after submission)</td></tr>
+  <tr><td>total_questions</td><td>INT</td><td><span class="req">NOT NULL</span></td></tr>
+  <tr><td>time_taken_sec</td><td>INT</td><td>NULL</td></tr>
+  <tr><td>created_at</td><td>TIMESTAMPTZ</td><td>DEFAULT now()</td></tr>
+</table>
+
+<h3>2.5 quiz_articles (M2M)</h3>
+<table>
+  <tr><th>Column</th><th>Type</th><th>Constraints</th></tr>
+  <tr><td>quiz_id</td><td>UUID</td><td><span class="fk">FK -> quizzes.id</span></td></tr>
+  <tr><td>article_id</td><td>UUID</td><td><span class="fk">FK -> articles.id</span></td></tr>
+  <tr><td colspan="2"><span class="pk">PK (quiz_id, article_id)</span></td><td></td></tr>
+</table>
+
+<h3>2.6 quiz_questions</h3>
+<table>
+  <tr><th>Column</th><th>Type</th><th>Constraints</th></tr>
+  <tr><td>id</td><td>UUID</td><td><span class="pk">PK</span></td></tr>
+  <tr><td>quiz_id</td><td>UUID</td><td><span class="fk">FK -> quizzes.id</span></td></tr>
+  <tr><td>question_text</td><td>TEXT</td><td><span class="req">NOT NULL</span></td></tr>
+  <tr><td>options</td><td>JSONB</td><td><span class="req">NOT NULL</span></td></tr>
+  <tr><td>correct_answer</td><td>VARCHAR(10)</td><td><span class="req">NOT NULL</span> ('A','B','C','D')</td></tr>
+  <tr><td>explanation</td><td>TEXT</td><td>NULL</td></tr>
+  <tr><td>difficulty</td><td>VARCHAR(10)</td><td>NULL ('easy','medium','hard')</td></tr>
+  <tr><td>ai_interaction_id</td><td>UUID</td><td><span class="fk">FK -> ai_interactions.id</span></td></tr>
+</table>
+
+<h3>2.7 quiz_answers</h3>
+<table>
+  <tr><th>Column</th><th>Type</th><th>Constraints</th></tr>
+  <tr><td>id</td><td>UUID</td><td><span class="pk">PK</span></td></tr>
+  <tr><td>user_id</td><td>UUID</td><td><span class="fk">FK -> users.id</span></td></tr>
+  <tr><td>question_id</td><td>UUID</td><td><span class="fk">FK -> quiz_questions.id</span></td></tr>
+  <tr><td>selected_answer</td><td>VARCHAR(10)</td><td>NULL</td></tr>
+  <tr><td>is_correct</td><td>BOOLEAN</td><td>NULL</td></tr>
+  <tr><td>time_taken_sec</td><td>INT</td><td>NULL</td></tr>
+</table>
+
+<h3>2.8 ai_interactions (Training Data)</h3>
+<table>
+  <tr><th>Column</th><th>Type</th><th>Constraints</th></tr>
+  <tr><td>id</td><td>UUID</td><td><span class="pk">PK</span></td></tr>
+  <tr><td>user_id</td><td>UUID</td><td><span class="fk">FK -> users.id</span> NULL</td></tr>
+  <tr><td>article_id</td><td>UUID</td><td><span class="fk">FK -> articles.id</span> NULL</td></tr>
+  <tr><td>persona</td><td>VARCHAR(50)</td><td><span class="req">NOT NULL</span> ('summarizer','question_setter')</td></tr>
+  <tr><td>model_used</td><td>VARCHAR(100)</td><td><span class="req">NOT NULL</span></td></tr>
+  <tr><td>prompt</td><td>TEXT</td><td><span class="req">NOT NULL</span></td></tr>
+  <tr><td>response</td><td>TEXT</td><td><span class="req">NOT NULL</span></td></tr>
+  <tr><td>latency_ms</td><td>INT</td><td>NULL</td></tr>
+  <tr><td>tokens_used</td><td>INT</td><td>NULL</td></tr>
+  <tr><td>user_feedback</td><td>INT</td><td>NULL (-1,0,1)</td></tr>
+  <tr><td>admin_edited_response</td><td>TEXT</td><td>NULL (golden data)</td></tr>
+  <tr><td>in_training_dataset</td><td>BOOLEAN</td><td>DEFAULT false</td></tr>
+  <tr><td>created_at</td><td>TIMESTAMPTZ</td><td>DEFAULT now()</td></tr>
+</table>
+
+<h3>2.9 training_datasets</h3>
+<table>
+  <tr><th>Column</th><th>Type</th><th>Constraints</th></tr>
+  <tr><td>id</td><td>UUID</td><td><span class="pk">PK</span></td></tr>
+  <tr><td>name</td><td>VARCHAR(200)</td><td><span class="req">NOT NULL</span></td></tr>
+  <tr><td>persona</td><td>VARCHAR(50)</td><td><span class="req">NOT NULL</span></td></tr>
+  <tr><td>base_model</td><td>VARCHAR(200)</td><td>NULL</td></tr>
+  <tr><td>num_examples</td><td>INT</td><td>NULL</td></tr>
+  <tr><td>status</td><td>VARCHAR(20)</td><td>DEFAULT 'collecting'</td></tr>
+  <tr><td>lora_adapter_path</td><td>TEXT</td><td>NULL (HF repo ID or MinIO path)</td></tr>
+  <tr><td>metrics</td><td>JSONB</td><td>NULL (eval results)</td></tr>
+  <tr><td>created_at</td><td>TIMESTAMPTZ</td><td>DEFAULT now()</td></tr>
+</table>
+
+<h3>2.10 exam_questions (Pre-loaded Training Data)</h3>
+<table>
+  <tr><th>Column</th><th>Type</th><th>Constraints</th></tr>
+  <tr><td>id</td><td>UUID</td><td><span class="pk">PK</span></td></tr>
+  <tr><td>year</td><td>INT</td><td><span class="req">NOT NULL</span></td></tr>
+  <tr><td>subject</td><td>VARCHAR(100)</td><td>NULL</td></tr>
+  <tr><td>topic</td><td>VARCHAR(200)</td><td>NULL</td></tr>
+  <tr><td>question_text</td><td>TEXT</td><td><span class="req">NOT NULL</span></td></tr>
+  <tr><td>options</td><td>JSONB</td><td>NULL</td></tr>
+  <tr><td>correct_answer</td><td>VARCHAR(10)</td><td>NULL</td></tr>
+  <tr><td>explanation</td><td>TEXT</td><td>NULL</td></tr>
+  <tr><td>question_type</td><td>VARCHAR(30)</td><td>NULL ('statement','match','assertion_reason','sequence')</td></tr>
+  <tr><td>difficulty</td><td>VARCHAR(10)</td><td>NULL</td></tr>
+</table>
+
+<!-- ===== 3. API ENDPOINTS ===== -->
+<h2>3. API Endpoints (FastAPI)</h2>
+
+<h3>3.1 Auth</h3>
+<table>
+  <tr><th>Method</th><th>Path</th><th>Request</th><th>Response</th></tr>
+  <tr><td>POST</td><td>/api/auth/register</td><td>{ email, password, name }</td><td>{ user, token }</td></tr>
+  <tr><td>POST</td><td>/api/auth/login</td><td>{ email, password }</td><td>{ user, token }</td></tr>
+  <tr><td>GET</td><td>/api/auth/me</td><td>Header: Auth token</td><td>{ user }</td></tr>
+</table>
+
+<h3>3.2 Articles</h3>
+<table>
+  <tr><th>Method</th><th>Path</th><th>Params</th><th>Response</th></tr>
+  <tr><td>GET</td><td>/api/articles</td><td>?source=&topic=&date_from=&date_to=&page=&per_page=</td><td>{ articles[], total, page }</td></tr>
+  <tr><td>GET</td><td>/api/articles/{id}</td><td>-</td><td>{ article with full fields }</td></tr>
+  <tr><td>GET</td><td>/api/categories</td><td>?parent_id=</td><td>{ categories[] } (UPSC tree)</td></tr>
+</table>
+
+<h3>3.3 Quizzes</h3>
+<table>
+  <tr><th>Method</th><th>Path</th><th>Request/Params</th><th>Response</th></tr>
+  <tr><td>POST</td><td>/api/quizzes/generate</td><td>{ article_ids[], num_questions }</td><td>{ quiz_id } (checks cache by article_set_hash first)</td></tr>
+  <tr><td>GET</td><td>/api/quizzes/{id}</td><td>-</td><td>{ quiz with questions (no answers yet) }</td></tr>
+  <tr><td>POST</td><td>/api/quizzes/{id}/submit</td><td>{ answers: { question_id: answer }[] }</td><td>{ score, total, results[] }</td></tr>
+</table>
+
+<h3>3.4 History</h3>
+<table>
+  <tr><th>Method</th><th>Path</th><th>Params</th><th>Response</th></tr>
+  <tr><td>GET</td><td>/api/history</td><td>?page=&per_page=</td><td>{ quizzes[] with scores + article count }</td></tr>
+  <tr><td>GET</td><td>/api/history/{id}</td><td>-</td><td>{ quiz with questions, answers, articles[] }</td></tr>
+</table>
+
+<h3>3.5 Admin</h3>
+<table>
+  <tr><th>Method</th><th>Path</th><th>Request/Params</th><th>Response</th></tr>
+  <tr><td>GET</td><td>/api/admin/interactions</td><td>?persona=&status=&page=</td><td>{ interactions[] }</td></tr>
+  <tr><td>PUT</td><td>/api/admin/interactions/{id}</td><td>{ user_feedback, admin_edited_response }</td><td>{ interaction }</td></tr>
+  <tr><td>POST</td><td>/api/admin/datasets</td><td>{ name, persona, interaction_ids[] }</td><td>{ dataset }</td></tr>
+  <tr><td>GET</td><td>/api/admin/models</td><td>-</td><td>{ models: { summarizer, question_setter } }</td></tr>
+  <tr><td>PUT</td><td>/api/admin/models</td><td>{ persona, provider, lora_adapter }</td><td>{ model config }</td></tr>
+  <tr><td>POST</td><td>/api/admin/fine-tune</td><td>{ dataset_id, hyperparams }</td><td>{ job_id, status }</td></tr>
+</table>
+
+<!-- ===== 4. SEQUENCE DIAGRAMS ===== -->
+<h2>4. Sequence Diagrams</h2>
+
+<h3>4.1 Article Ingestion</h3>
+<div class="seq">
+<span class="nt"># Daily cron job (Celery beat)</span><br><br>
+<span class="a">Cron</span> <span class="arr">-></span> <span class="a">Scraper</span> <span class="req">: fetch RSS feeds</span><br>
+<span class="a">Scraper</span> <span class="arr">-></span> <span class="a">The Hindu RSS</span> <span class="req">: GET /rss/</span><br>
+<span class="a">The Hindu RSS</span> <span class="arr">-->></span> <span class="a">Scraper</span> <span class="res">: XML items</span><br>
+<span class="a">Scraper</span> <span class="arr">-></span> <span class="a">Article URL</span> <span class="req">: GET article page</span><br>
+<span class="a">Article URL</span> <span class="arr">-->></span> <span class="a">Scraper</span> <span class="res">: HTML</span><br>
+<span class="a">Scraper</span> <span class="arr">-></span> <span class="a">Scraper</span> <span class="req">: extract body text</span><br>
+<span class="a">Scraper</span> <span class="arr">-></span> <span class="a">AI Orchestrator</span> <span class="req">: summarize(body_text)</span><br>
+<span class="a">AI Orchestrator</span> <span class="arr">-></span> <span class="a">Model Registry</span> <span class="req">: get summarizer config</span><br>
+<span class="a">Model Registry</span> <span class="arr">-->></span> <span class="a">AI Orchestrator</span> <span class="res">: provider=nim, model=llama</span><br>
+<span class="a">AI Orchestrator</span> <span class="arr">-></span> <span class="a">NVIDIA NIM</span> <span class="req">: POST /chat/completions</span><br>
+<span class="a">NVIDIA NIM</span> <span class="arr">-->></span> <span class="a">AI Orchestrator</span> <span class="res">: summary + tags + key terms</span><br>
+<span class="a">AI Orchestrator</span> <span class="arr">-></span> <span class="a">Training Collector</span> <span class="req">: save interaction</span><br>
+<span class="a">AI Orchestrator</span> <span class="arr">-->></span> <span class="a">Scraper</span> <span class="res">: parsed result</span><br>
+<span class="a">Scraper</span> <span class="arr">-></span> <span class="a">Database</span> <span class="req">: INSERT article</span><br>
+</div>
+
+<h3>4.2 Quiz Generation & Taking (with Caching)</h3>
+<div class="seq">
+<span class="a">User</span> <span class="arr">-></span> <span class="a">Frontend</span> <span class="req">: select 3 articles, click "Generate Quiz"</span><br>
+<span class="a">Frontend</span> <span class="arr">-></span> <span class="a">API</span> <span class="req">: POST /quizzes/generate { article_ids }</span><br>
+<span class="a">API</span> <span class="arr">-></span> <span class="a">Quiz Service</span> <span class="req">: generate quiz</span><br>
+<span class="a">Quiz Service</span> <span class="arr">-></span> <span class="a">Quiz Service</span> <span class="req">: compute MD5(sorted article_ids)</span><br>
+<span class="a">Quiz Service</span> <span class="arr">-></span> <span class="a">Database</span> <span class="req">: SELECT quiz WHERE article_set_hash = ?</span><br>
+<span class="nt"># ── CACHE HIT PATH ──</span><br>
+<span class="a">Database</span> <span class="arr">-->></span> <span class="a">Quiz Service</span> <span class="res">: existing quiz found!</span><br>
+<span class="a">Quiz Service</span> <span class="arr">-->></span> <span class="a">API</span> <span class="res">: { quiz_id } (existing, no LLM call)</span><br>
+<span class="arr">│</span><br>
+<span class="nt"># ── CACHE MISS PATH ──</span><br>
+<span class="a">Database</span> <span class="arr">-->></span> <span class="a">Quiz Service</span> <span class="res">: no existing quiz</span><br>
+<span class="a">Quiz Service</span> <span class="arr">-></span> <span class="a">Database</span> <span class="req">: fetch articles + summaries</span><br>
+<span class="a">Quiz Service</span> <span class="arr">-></span> <span class="a">AI Orchestrator</span> <span class="req">: generate_mcq(articles)</span><br>
+<span class="a">AI Orchestrator</span> <span class="arr">-></span> <span class="a">NVIDIA NIM</span> <span class="req">: POST /chat/completions</span><br>
+<span class="a">NVIDIA NIM</span> <span class="arr">-->></span> <span class="a">AI Orchestrator</span> <span class="res">: 10 MCQs JSON</span><br>
+<span class="a">AI Orchestrator</span> <span class="arr">-></span> <span class="a">Training Collector</span> <span class="req">: save interaction (first gen only)</span><br>
+<span class="a">AI Orchestrator</span> <span class="arr">-->></span> <span class="a">Quiz Service</span> <span class="res">: parsed questions</span><br>
+<span class="a">Quiz Service</span> <span class="arr">-></span> <span class="a">Database</span> <span class="req">: INSERT quiz + questions + quiz_articles (with hash)</span><br>
+<span class="a">Quiz Service</span> <span class="arr">-->></span> <span class="a">API</span> <span class="res">: { quiz_id }</span><br>
+<span class="a">API</span> <span class="arr">-->></span> <span class="a">Frontend</span> <span class="res">: { quiz_id }</span><br><br>
+<span class="a">User</span> <span class="arr">-></span> <span class="a">Frontend</span> <span class="req">: open quiz (redirect to /quiz/{id})</span><br>
+<span class="a">Frontend</span> <span class="arr">-></span> <span class="a">API</span> <span class="req">: GET /quizzes/{id}</span><br>
+<span class="a">API</span> <span class="arr">-->></span> <span class="a">Frontend</span> <span class="res">: { questions (no answers) }</span><br>
+<span class="a">User</span> <span class="arr">-></span> <span class="a">Frontend</span> <span class="req">: answer 10 questions, click "Submit"</span><br>
+<span class="a">Frontend</span> <span class="arr">-></span> <span class="a">API</span> <span class="req">: POST /quizzes/{id}/submit { answers[] }</span><br>
+<span class="a">API</span> <span class="arr">-></span> <span class="a">Quiz Service</span> <span class="req">: grade quiz</span><br>
+<span class="a">Quiz Service</span> <span class="arr">-></span> <span class="a">Database</span> <span class="req">: INSERT answers, UPDATE quiz score</span><br>
+<span class="a">Quiz Service</span> <span class="arr">-->></span> <span class="a">API</span> <span class="res">: { score, results[] }</span><br>
+<span class="a">API</span> <span class="arr">-->></span> <span class="a">Frontend</span> <span class="res">: { score: 7/10, results with explanations }</span><br>
+</div>
+
+<h3>4.3 Fine-Tuning Flow</h3>
+<div class="seq">
+<span class="a">Admin</span> <span class="arr">-></span> <span class="a">Admin UI</span> <span class="req">: browse interactions, approve 500 good ones</span><br>
+<span class="a">Admin</span> <span class="arr">-></span> <span class="a">Admin UI</span> <span class="req">: click "Build Dataset"</span><br>
+<span class="a">Admin UI</span> <span class="arr">-></span> <span class="a">API</span> <span class="req">: POST /datasets { persona, interaction_ids }</span><br>
+<span class="a">API</span> <span class="arr">-></span> <span class="a">Training Service</span> <span class="req">: build dataset</span><br>
+<span class="a">Training Service</span> <span class="arr">-></span> <span class="a">Database</span> <span class="req">: mark interactions as in_training_dataset</span><br>
+<span class="a">Training Service</span> <span class="arr">-></span> <span class="a">Training Service</span> <span class="req">: format as Alpaca JSONL</span><br>
+<span class="a">Training Service</span> <span class="arr">-->></span> <span class="a">Admin UI</span> <span class="res">: { dataset with download URL }</span><br><br>
+<span class="nt"># Admin downloads, uploads to Colab</span><br><br>
+<span class="a">Colab</span> <span class="arr">-></span> <span class="a">Hugging Face Hub</span> <span class="req">: download base model (Llama 3.1 8B)</span><br>
+<span class="a">Colab</span> <span class="arr">-></span> <span class="a">Colab</span> <span class="req">: QLoRA training on T4 GPU</span><br>
+<span class="a">Colab</span> <span class="arr">-></span> <span class="a">Hugging Face Hub</span> <span class="req">: push LoRA adapter</span><br><br>
+<span class="a">Admin</span> <span class="arr">-></span> <span class="a">Admin UI</span> <span class="req">: enter HF repo path, click "Deploy"</span><br>
+<span class="a">Admin UI</span> <span class="arr">-></span> <span class="a">API</span> <span class="req">: PUT /models { persona, lora_adapter }</span><br>
+<span class="a">API</span> <span class="arr">-></span> <span class="a">Model Registry</span> <span class="req">: update models.yaml</span><br>
+<span class="a">API</span> <span class="arr">-->></span> <span class="a">Admin UI</span> <span class="res">: { status: "deployed" }</span><br><br>
+<span class="nt"># Now every new request uses the fine-tuned model</span><br>
+<span class="a">User Request</span> <span class="arr">-></span> <span class="a">Orchestrator</span> <span class="req">: summarize(article)</span><br>
+<span class="a">Orchestrator</span> <span class="arr">-></span> <span class="a">Model Registry</span> <span class="req">: get summarizer</span><br>
+<span class="a">Model Registry</span> <span class="arr">-->></span> <span class="a">Orchestrator</span> <span class="res">: { provider: "nim", lora: "hf/username/lora-v1" }</span><br>
+<span class="a">Orchestrator</span> <span class="arr">-></span> <span class="a">NVIDIA NIM</span> <span class="req">: chat with LoRA adapter</span><br>
+</div>
+
+<!-- ===== 5. QUIZ CACHING STRATEGY ===== -->
+<h2>5. Quiz Caching Strategy</h2>
+
+<div class="card">
+<h4>Why?</h4>
+<p style="color:#94a3b8;font-size:0.85rem;line-height:1.6;">
+Every call to the LLM costs time (~5-10s) and API quota (NVIDIA NIM free tier: ~1000 req/day).
+If 10 different users select the same articles [A, B, C] and generate a quiz, without caching
+we'd call the LLM 10 times for the same output. With caching: <strong>1 call total</strong>.
+</p>
+</div>
+
+<div class="card">
+<h4>How?</h4>
+<pre>
+1. User sends POST /quizzes/generate with article_ids = [uuid-a, uuid-b, uuid-c]
+2. Backend computes: hash = MD5(sorted(["uuid-a", "uuid-b", "uuid-c"]).join(","))
+   -> e.g., "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6"
+3. Backend queries: SELECT id FROM quizzes WHERE article_set_hash = 'a1b2c3...'
+4. If EXISTS:
+     - Return existing quiz_id (no LLM call)
+   If NOT EXISTS:
+     - Call LLM to generate questions
+     - Save quiz with article_set_hash = hash
+     - Return new quiz_id
+5. User-specific association:
+     - quiz_articles already links quiz to articles
+     - Each user's history shows the quiz via their own quiz entry
+     - Multiple users can reference the same underlying questions
+</pre>
+</div>
+
+<div class="card">
+<h4>Database impact</h4>
+<pre>
+- quizzes.article_set_hash: VARCHAR(32) UNIQUE NOT NULL
+- No new tables needed
+- Index on article_set_hash for fast lookup
+- UNIQUE constraint ensures no duplicate quiz for same article set
+</pre>
+</div>
+
+<div class="card">
+<h4>Edge cases handled</h4>
+<pre>
+- Same articles, different order: hash uses SORTED IDs -> same hash -> cache hit
+- Same articles, different num_questions: we include num_questions in hash
+  -> hash = MD5(sorted(ids).join(",") + "|" + num_questions)
+- User generates quiz from articles [A,B] and later [A,B,C]: different hashes -> different quizzes
+- Admin edits a cached quiz's questions: unaffected, each quiz has its own questions row
+</pre>
+</div>
+
+<!-- ===== 6. MODEL REGISTRY CONFIG ===== -->
+<h2>6. Model Registry Config</h2>
+<pre>
+<span class="cm"># backend/ai/config/models.yaml</span>
+
+models:
+  summarizer:
+    active_provider: nim
+    providers:
+      nim:
+        model: meta-llama/Llama-3.1-8B-Instruct
+        base_url: https://api.nvcf.nvidia.com/v2/llm/nim
+        lora_adapter: null  <span class="cm"># "username/taazi-summarizer-v1" after FT</span>
+        max_tokens: 512
+        temperature: 0.3
+      vllm:
+        model: meta-llama/Llama-3.1-8B-Instruct
+        base_url: http://localhost:8001/v1
+        lora_adapter: null
+        max_tokens: 512
+        temperature: 0.3
+
+  question_setter:
+    active_provider: nim
+    providers:
+      nim:
+        model: meta-llama/Llama-3.1-8B-Instruct
+        base_url: https://api.nvcf.nvidia.com/v2/llm/nim
+        lora_adapter: null  <span class="cm"># "username/taazi-quizzer-v1" after FT</span>
+        max_tokens: 1024
+        temperature: 0.7
+      vllm:
+        model: meta-llama/Llama-3.1-8B-Instruct
+        base_url: http://localhost:8001/v1
+        lora_adapter: null
+        max_tokens: 1024
+        temperature: 0.7
+</pre>
+
+<!-- ===== 7. PROMPT TEMPLATES ===== -->
+<h2>6. Prompt Templates</h2>
+
+<h3>6.1 GK Summarizer</h3>
+<pre>
+<span class="cm"># backend/ai/config/prompts/summarizer.yaml</span>
+
+system: |
+  You are a UPSC GK Summarizer. Your role is to extract only information 
+  relevant to UPSC Civil Services Examination (Prelims & Mains) from newspaper 
+  articles.
+
+  For each article, provide:
+  1. GK_GIST: 3-4 line summary covering what matters for UPSC
+  2. SYLLABUS_TOPIC: The UPSC syllabus subject and topic (e.g., "Polity > Parliament > Parliamentary Committees")
+  3. KEY_TERMS: 3-5 important terms/concepts the aspirant should remember
+  4. PRELIMS_ANGLE: What type of question could be asked from this in Prelims
+  5. MAINS_ANGLE: What type of question could be asked in Mains (if applicable)
+
+user: |
+  Article: {headline}
+  Source: {source}
+  Date: {published_at}
+
+  Body:
+  {body_text}
+
+  Respond in JSON format exactly like this example:
+  {
+    "gk_gist": "The Supreme Court ruled that...",
+    "syllabus_topic": "Polity > Judiciary > Supreme Court",
+    "key_terms": ["Writ jurisdiction", "Article 32", "Judicial review"],
+    "prelims_angle": "Statement-based question on writ jurisdiction",
+    "mains_angle": "Discuss the scope of Article 32"
+  }
+</pre>
+
+<h3>6.2 Question Setter</h3>
+<pre>
+<span class="cm"># backend/ai/config/prompts/question_setter.yaml</span>
+
+system: |
+  You are a UPSC Prelims Question Setter. Given article summaries on current 
+  affairs topics, create UPSC-style multiple choice questions.
+
+  Guidelines:
+  - Mix question types: statement-based, match lists, assertion-reason, sequence
+  - Difficulty should match UPSC Prelims standard
+  - One question can cover multiple articles
+  - Each question must have 4 options (A, B, C, D)
+  - Provide correct answer with explanation
+  - Avoid trivial/factual recall; focus on conceptual understanding
+
+user: |
+  Generate {num_questions} MCQs based on these article summaries:
+
+  {article_summaries}
+
+  Respond in JSON format exactly like this example:
+  {
+    "questions": [
+      {
+        "question": "Consider the following statements about the Delimitation Commission:",
+        "type": "statement",
+        "options": {
+          "A": "Statement 1 only",
+          "B": "Statement 2 only",
+          "C": "Both 1 and 2",
+          "D": "Neither 1 nor 2"
+        },
+        "correct_answer": "C",
+        "explanation": "Both statements are correct because...",
+        "difficulty": "medium",
+        "topic": "Polity > Election Commission"
+      }
+    ]
+  }
+</pre>
+
+<!-- ===== 8. COMPONENT TREE ===== -->
+<h2>7. Frontend Component Tree</h2>
+<div class="card">
+<pre>
+<span class="cm">// Page-level components</span>
+RootLayout
+  +- Navbar (UPSC branding, nav links, auth status, admin link)
+  +- (page content)
+
+NewsFeedPage (/)
+  +- FilterBar (source filter, date range, topic filter)
+  +- ArticleList
+  |   +- ArticleCard (per article)
+  |       +- SyllabusTag (colored badge with UPSC topic)
+  |       +- GKSummary (3-4 line excerpt)
+  |       +- KeyTermsList (highlighted terms)
+  |       +- SourceLink (link to original article)
+  |       +- SelectButton (checkbox for quiz selection)
+  +- FloatingSelectionBar (shows selected count, "Generate Quiz" button)
+
+QuizPage (/quiz)
+  +- ArticleSelector (presents selected articles)
+  +- QuizConfig (num questions slider, difficulty)
+  +- GenerateButton
+
+TakeQuizPage (/quiz/[id])
+  +- QuizTimer
+  +- QuestionList
+  |   +- QuizQuestion (per question)
+  |       +- QuestionText
+  |       +- OptionsGrid (A/B/C/D buttons)
+  |       +- QuestionNavigator (prev/next)
+  +- SubmitButton
+
+HistoryPage (/history)
+  +- HistoryList
+  |   +- HistoryCard (per quiz)
+  |       +- QuizMeta (date, score, article count)
+  |       +- ArticlePreviewList (mini cards of linked articles)
+
+AdminPage (/admin)
+  +- AdminSidebar (Data, Datasets, Models links)
+
+AdminTrainingDataPage (/admin/training-data)
+  +- FilterControls (persona, date, quality)
+  +- InteractionsTable
+  |   +- InteractionRow (prompt, response, feedback controls)
+  +- BulkActions (select all, approve, build dataset)
+
+AdminDatasetsPage (/admin/datasets)
+  +- DatasetList
+  |   +- DatasetCard (name, count, status, deploy button)
+  +- BuildDatasetModal (filters, preview, create)
+
+AdminModelsPage (/admin/models)
+  +- ModelCard (per persona: summarizer, question_setter)
+  |   +- ActiveProviderBadge
+  |   +- LoRAAdapterInfo
+  |   +- SwapProviderButton
+  |   +- A/B TestToggle
+</pre>
+</div>
+
+<!-- ===== 9. DEPENDENCY INJECTION ===== -->
+<h2>8. Backend Dependency Injection (FastAPI)</h2>
+<pre>
+<span class="cm"># backend/app/deps.py</span>
+
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    async with SessionLocal() as session:
+        yield session
+
+async def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db)
+) -> User:
+    ...
+
+async def get_admin_user(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    if not current_user.is_admin:
+        raise HTTPException(403)
+    return current_user
+
+async def get_ai_orchestrator() -> AIOrchestrator:
+    registry = ModelRegistry("config/models.yaml")
+    collector = TrainingDataCollector()
+    return AIOrchestrator(registry, collector)
+</pre>
+
+<!-- ===== 10. SERVICE LAYER ===== -->
+<h2>9. Key Service Methods</h2>
+
+<div class="grid-2">
+<div class="card">
+<h4>ArticleService</h4>
+<ul>
+<li>list(filters, pagination) -> articles</li>
+<li>get_by_id(id) -> article</li>
+<li>get_by_source_and_url(source, url) -> article | None</li>
+<li>create(article_data) -> article</li>
+<li>update_ai_fields(id, summary, tags, terms) -> article</li>
+<li>search(query, vector) -> articles</li>
+</ul>
+</div>
+<div class="card">
+<h4>QuizService</h4>
+<ul>
+<li><strong>generate(user_id, article_ids, num_questions)</strong> -> quiz_id</li>
+<li>&nbsp;&nbsp;1. Compute hash = MD5(sorted(article_ids))</li>
+<li>&nbsp;&nbsp;2. SELECT quiz WHERE article_set_hash = hash</li>
+<li>&nbsp;&nbsp;3. If found: return existing quiz_id <span class="cm">// Cache hit, zero LLM</span></li>
+<li>&nbsp;&nbsp;4. If not found: call LLM, save with hash, return new quiz_id</li>
+<li>get_quiz(quiz_id, user_id) -> quiz (without answers)</li>
+<li>submit_answers(quiz_id, user_id, answers) -> score + results</li>
+<li>get_history(user_id, pagination) -> quizzes[]</li>
+<li>get_history_detail(quiz_id, user_id) -> quiz + articles</li>
+</ul>
+</div>
+<div class="card">
+<h4>TrainingService</h4>
+<ul>
+<li>list_interactions(filters) -> interactions</li>
+<li>update_interaction(id, feedback, edited_response) -> interaction</li>
+<li>build_dataset(name, persona, interaction_ids) -> dataset</li>
+<li>get_datasets(filters) -> datasets[]</li>
+<li>export_dataset(dataset_id) -> JSONL download</li>
+</ul>
+</div>
+<div class="card">
+<h4>AIOrchestrator</h4>
+<ul>
+<li>summarize(body_text) -> { gist, tags, terms }</li>
+<li>generate_mcq(articles[], num) -> questions[]</li>
+<li>evaluate_answer(question, user_answer) -> feedback</li>
+<li>_get_provider(persona) -> provider instance</li>
+</ul>
+</div>
+</div>
+
+<!-- ===== 11. SCRAPER DESIGN ===== -->
+<h2>10. Scraper Design</h2>
+<div class="card">
+<pre>
+<span class="cm"># backend/app/scrapers/base.py</span>
+
+class BaseScraper(ABC):
+    """Abstract scraper with common RSS pipeline."""
+
+    @property
+    @abstractmethod
+    def source_name(self) -> str: ...
+
+    @property
+    @abstractmethod
+    def rss_urls(self) -> list[str]: ...
+
+    @abstractmethod
+    def extract_body(self, soup: BeautifulSoup) -> str: ...
+
+    async def run(self):
+        """Called by Celery beat daily."""
+        for rss_url in self.rss_urls:
+            feed = await self._fetch_rss(rss_url)
+            for entry in feed.entries:
+                if not self._is_already_scraped(entry.link):
+                    article = await self._scrape_article(entry)
+                    summary = await ai_orchestrator.summarize(article.body)
+                    save_to_db(article, summary)
+
+<span class="cm"># Respects robots.txt, rate-limited (1 req/2 sec), caches aggressively</span>
+</pre>
+</div>
+
+<!-- ===== 12. CELERY TASKS ===== -->
+<h2>11. Celery Task Queue</h2>
+<div class="card">
+<pre>
+<span class="cm"># Tasks run asynchronously via Redis broker</span>
+
+@celery.task
+def scrape_all_sources():
+    """Daily: scrape The Hindu + Indian Express"""
+    await scraper.run()
+
+@celery.task
+def generate_quiz_background(user_id, article_ids, num_questions):
+    """Async quiz generation (takes 5-10 sec for LLM call)"""
+    pass
+
+@celery.task
+def fine_tune_model(dataset_id, hyperparams):
+    """Triggered from admin UI. Actually runs in Colab notebook."""
+    pass
+</pre>
+</div>
+
+<!-- ===== 13. NVIDIA NIM INTEGRATION ===== -->
+<h2>12. Provider: NVIDIA NIM</h2>
+<div class="card">
+<pre>
+<span class="cm"># backend/app/ai/providers/nim.py</span>
+
+class NVIDIAProvider(BaseProvider):
+    """Free tier: 1000 requests/day, Llama 3.1 8B"""
+
+    BASE_URL = "https://api.nvcf.nvidia.com/v2/llm/nim"
+
+    async def complete(
+        self,
+        prompt: str,
+        system: str,
+        max_tokens: int = 512,
+        temperature: float = 0.3
+    ) -> ProviderResponse:
+        headers = {
+            "Authorization": f"Bearer {settings.NVIDIA_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": self.model_config.model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": prompt}
+            ],
+            "max_tokens": max_tokens,
+            "temperature": temperature
+        }
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(self.BASE_URL, headers=headers, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+            return ProviderResponse(
+                text=data["choices"][0]["message"]["content"],
+                tokens_used=data["usage"]["total_tokens"],
+                latency_ms=data.get("latency", 0)
+            )
+
+    async def complete_with_lora(
+        self, prompt: str, system: str, lora_adapter: str
+    ) -> ProviderResponse:
+        """After fine-tuning: pass LoRA adapter name in request."""
+        # NVIDIA NIM supports LoRA via header: NVCF_LORA_ADAPTER
+        headers["NVCF_LORA_ADAPTER"] = lora_adapter
+        return await self.complete(prompt, system)
+</pre>
+</div>
+
+<!-- ===== 14. FINE-TUNING NOTEBOOK (Colab) ===== -->
+<h2>13. Fine-Tuning Notebook (Google Colab)</h2>
+<div class="card">
+<pre>
+<span class="cm"># notebooks/fine_tune_summarizer.ipynb</span>
+<span class="cm"># Full notebook to be created, key steps:</span>
+
+1. Install deps: transformers, peft, trl, bitsandbytes, accelerate
+2. Load base model: meta-llama/Llama-3.1-8B-Instruct (4-bit QLoRA)
+3. Load training dataset: JSONL in Alpaca format
+   - Each example: { "instruction": system prompt, "input": article, "output": summary }
+4. Configure LoRA: r=16, alpha=32, dropout=0.05, target_modules=[q_proj, v_proj]
+5. Train: 3 epochs, batch_size=2, gradient_accumulation=4
+6. Evaluate on held-out test set
+7. Push adapter to Hugging Face Hub: username/taazi-summarizer-v1
+8. Done! ~45 minutes on T4 GPU for 500 examples
+</pre>
+</div>
+
+</body>
+</html>

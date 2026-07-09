@@ -17,7 +17,7 @@ router = APIRouter()
 @router.get("", response_model=ArticleListResponse)
 async def list_articles(
     skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int | None = Query(None, ge=1, le=100),
     source: str | None = Query(None),
     category_id: UUID | None = Query(None),
     date_str: str | None = Query(None, alias="date"),

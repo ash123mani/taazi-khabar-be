@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Taazi Khabar — High-Level Design (Zero Cost)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 2rem; }
+  h1 { font-size: 2.5rem; font-weight: 800; color: #f8fafc; margin-bottom: 0.25rem; }
+  h1 span { color: #22d3ee; }
+  .subtitle { color: #94a3b8; font-size: 1.1rem; margin-bottom: 2rem; }
+  .zero-badge { display: inline-block; background: #059669; color: #fff; font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.8rem; border-radius: 999px; margin-left: 0.5rem; }
+  h2 { font-size: 1.5rem; font-weight: 700; color: #f8fafc; margin: 2rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #334155; }
+  h2 .badge { font-size: 0.7rem; background: #22d3ee; color: #0f172a; padding: 0.15rem 0.6rem; border-radius: 999px; font-weight: 600; vertical-align: middle; margin-left: 0.5rem; }
+  h3 { font-size: 1.1rem; font-weight: 600; color: #cbd5e1; margin: 1.5rem 0 0.75rem; }
+  .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 1.25rem; margin: 0.75rem 0; }
+  .card h4 { font-size: 1rem; font-weight: 700; color: #f8fafc; margin-bottom: 0.75rem; }
+  .card ul { list-style: none; }
+  .card ul li { padding: 0.35rem 0; font-size: 0.85rem; color: #cbd5e1; border-bottom: 1px solid #1e293b; }
+  .card ul li:last-child { border-bottom: none; }
+  .card ul li::before { content: "> "; color: #22d3ee; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1rem 0; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; margin: 1rem 0; }
+  .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+  @media (max-width: 768px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } }
+
+  .arch { display: flex; flex-direction: column; align-items: center; margin: 1.5rem 0; }
+  .layer { width: 100%; margin-bottom: 0.5rem; }
+  .layer-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 0.5rem; }
+  .layer-boxes { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+  .layer-box { background: #1e293b; border: 2px solid #334155; border-radius: 10px; padding: 0.75rem 1rem; flex: 1; min-width: 130px; }
+  .layer-box.free { border-color: #059669; }
+  .layer-box.ai { border-color: #a78bfa; }
+  .layer-box .icon { font-size: 1.2rem; }
+  .layer-box .title { font-weight: 600; font-size: 0.85rem; margin: 0.15rem 0; }
+  .layer-box .sub { font-size: 0.7rem; color: #94a3b8; }
+  .layer-box .host { font-size: 0.65rem; color: #059669; margin-top: 0.3rem; font-family: monospace; }
+  .layer-connect { display: flex; justify-content: center; color: #475569; font-size: 1rem; padding: 0.1rem 0; }
+
+  .persona-row { display: flex; gap: 1.5rem; margin: 1rem 0; }
+  .persona { flex: 1; background: #1e293b; border: 2px solid; border-radius: 12px; padding: 1.25rem; position: relative; }
+  .persona.green { border-color: #22d3ee; }
+  .persona.purple { border-color: #a78bfa; }
+  .persona .tag { position: absolute; top: -0.6rem; right: 1rem; font-size: 0.65rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 999px; }
+  .persona.green .tag { background: #22d3ee; color: #0f172a; }
+  .persona.purple .tag { background: #a78bfa; color: #0f172a; }
+  .persona h4 { font-size: 1.1rem; margin-bottom: 0.5rem; }
+  .persona .io { font-size: 0.8rem; color: #94a3b8; margin-top: 0.3rem; }
+  .persona .io span { color: #cbd5e1; }
+  @media (max-width: 768px) { .persona-row { flex-direction: column; } }
+
+  .flow { display: flex; align-items: center; justify-content: space-between; background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 1rem 1.5rem; margin: 0.75rem 0; flex-wrap: wrap; }
+  .flow-step { text-align: center; flex: 1; min-width: 60px; }
+  .flow-step .icon { font-size: 1.5rem; }
+  .flow-step .label { font-size: 0.75rem; font-weight: 600; margin-top: 0.2rem; }
+  .flow-arrow { color: #475569; font-size: 1.2rem; }
+
+  .pipe { display: flex; align-items: center; gap: 0.5rem; background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 1rem; margin: 0.75rem 0; overflow-x: auto; }
+  .pipe-step { text-align: center; min-width: 75px; }
+  .pipe-step .icon { font-size: 1.3rem; }
+  .pipe-step .label { font-size: 0.7rem; font-weight: 600; margin-top: 0.15rem; }
+  .pipe-arr { color: #475569; }
+
+  table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; font-size: 0.8rem; }
+  th { text-align: left; padding: 0.5rem 0.75rem; background: #1e293b; color: #94a3b8; font-weight: 600; border-bottom: 2px solid #334155; font-size: 0.75rem; text-transform: uppercase; }
+  td { padding: 0.45rem 0.75rem; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
+  tr:hover td { background: #1e293b; }
+  .free-cost { background: #064e3b; border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.7rem; color: #6ee7b7; }
+  .cost-zero { color: #6ee7b7; font-weight: 600; }
+  .note { background: #1e293b; border-left: 4px solid #059669; border-radius: 8px; padding: 1rem; margin: 1rem 0; font-size: 0.85rem; color: #cbd5e1; }
+  .note strong { color: #6ee7b7; }
+</style>
+</head>
+<body>
+
+<h1>Taazi <span>Khabar</span></h1>
+<div class="subtitle">High-Level Design — <strong>Zero Cost</strong> Architecture <span class="zero-badge">$0/mo MVP</span></div>
+
+<!-- ===== INTRO ===== -->
+<div class="note">
+  <strong>Zero-Cost Philosophy:</strong> Every component chosen specifically for its generous free tier. The entire MVP runs at $0/month. Only pay if you scale beyond free limits.
+</div>
+
+<!-- ===== TWO PERSONAS ===== -->
+<h2>Two Fine-Tuned LLM Personas</h2>
+
+<div class="persona-row">
+  <div class="persona green">
+    <span class="tag">LoRA: summary-v1</span>
+    <h4>GK Summarizer</h4>
+    <div class="io"><strong>Input:</strong> <span>Newspaper article (full text)</span></div>
+    <div class="io"><strong>Output:</strong> <span>3-4 line UPSC gist + syllabus tag + key terms</span></div>
+    <div class="io" style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid #334155;color:#64748b;">Trained on: Past 20yr UPSC papers + expert summaries + syllabus taxonomy</div>
+  </div>
+  <div class="persona purple">
+    <span class="tag">LoRA: quizzer-v1</span>
+    <h4>Question Setter</h4>
+    <div class="io"><strong>Input:</strong> <span>1-5 selected articles</span></div>
+    <div class="io"><strong>Output:</strong> <span>5-10 UPSC Prelims MCQs + answer key + explanations</span></div>
+    <div class="io" style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid #334155;color:#64748b;">Trained on: UPSC Prelims 1995-2025 + topic-wise question banks</div>
+  </div>
+</div>
+
+<!-- ===== ZERO-COST ARCHITECTURE ===== -->
+<h2>Zero-Cost Architecture</h2>
+
+<div class="arch">
+  <div class="layer">
+    <div class="layer-label">PRESENTATION LAYER</div>
+    <div class="layer-boxes">
+      <div class="layer-box free"><div class="icon">Next.js</div><div class="title">Frontend</div><div class="sub">SSR + PWA + Admin UI</div><div class="host">Vercel Free</div></div>
+    </div>
+  </div>
+  <div class="layer-connect">| NextAuth.js (free) |</div>
+  <div class="layer">
+    <div class="layer-label">API LAYER</div>
+    <div class="layer-boxes">
+      <div class="layer-box free"><div class="icon">FastAPI</div><div class="title">Backend</div><div class="sub">Async Python API</div><div class="host">Render Free / Railway</div></div>
+    </div>
+  </div>
+  <div class="layer-connect">| AI Orchestrator + Training Data Collector |</div>
+  <div class="layer">
+    <div class="layer-label">AI LAYER</div>
+    <div class="layer-boxes">
+      <div class="layer-box ai"><div class="icon">NVIDIA NIM</div><div class="title">LLM Inference</div><div class="sub">Llama 3.1 8B (free tier)</div><div class="host">Free API</div></div>
+      <div class="layer-box ai"><div class="icon">Google Colab</div><div class="title">Fine-Tuning</div><div class="sub">QLoRA training (T4 GPU)</div><div class="host">Free Tier</div></div>
+      <div class="layer-box ai"><div class="icon">HuggingFace</div><div class="title">LoRA Storage</div><div class="sub">Adapter weights</div><div class="host">Free Hub</div></div>
+    </div>
+  </div>
+  <div class="layer-connect">| Data Layer |</div>
+  <div class="layer">
+    <div class="layer-label">DATA LAYER</div>
+    <div class="layer-boxes">
+      <div class="layer-box free"><div class="icon">Supabase</div><div class="title">PostgreSQL + pgvector</div><div class="sub">500MB database</div><div class="host">Free Tier</div></div>
+      <div class="layer-box free"><div class="icon">Upstash</div><div class="title">Redis</div><div class="sub">256MB cache</div><div class="host">Free Tier</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== COST BREAKDOWN ===== -->
+<h2>Cost Breakdown <span class="badge">$0.00/month</span></h2>
+
+<table>
+  <tr><th>Service</th><th>Tier</th><th>Limits</th><th>Cost</th></tr>
+  <tr><td>Vercel</td><td>Hobby</td><td>100GB bandwidth, 6000 build min/mo</td><td class="cost-zero">$0</td></tr>
+  <tr><td>Render</td><td>Free</td><td>512MB RAM, sleeps after 15min idle</td><td class="cost-zero">$0</td></tr>
+  <tr><td>Supabase</td><td>Free</td><td>500MB DB, 1GB storage, 50K users</td><td class="cost-zero">$0</td></tr>
+  <tr><td>Upstash Redis</td><td>Free</td><td>256MB, 10K commands/day</td><td class="cost-zero">$0</td></tr>
+  <tr><td>NVIDIA NIM</td><td>Free</td><td>Rate-limited, enough for MVP</td><td class="cost-zero">$0</td></tr>
+  <tr><td>Google Colab</td><td>Free</td><td>T4 GPU, limited hours</td><td class="cost-zero">$0</td></tr>
+  <tr><td>Hugging Face Hub</td><td>Free</td><td>Unlimited public repos</td><td class="cost-zero">$0</td></tr>
+  <tr><td>GitHub Actions</td><td>Free</td><td>2000 min/month</td><td class="cost-zero">$0</td></tr>
+  <tr><td>GitHub Pages</td><td>Free</td><td>For docs site</td><td class="cost-zero">$0</td></tr>
+  <tr><td><strong>Total</strong></td><td></td><td></td><td class="cost-zero"><strong>$0</strong></td></tr>
+</table>
+
+<!-- ===== USER JOURNEY ===== -->
+<h2>User Journey</h2>
+<div class="flow">
+  <div class="flow-step"><div class="icon">Sign Up</div><div class="label">Email/Google</div></div>
+  <div class="flow-arrow">-></div>
+  <div class="flow-step"><div class="icon">Browse</div><div class="label">News Feed</div></div>
+  <div class="flow-arrow">-></div>
+  <div class="flow-step"><div class="icon">Select</div><div class="label">Articles</div></div>
+  <div class="flow-arrow">-></div>
+  <div class="flow-step"><div class="icon">Generate</div><div class="label">Quiz</div></div>
+  <div class="flow-arrow">-></div>
+  <div class="flow-step"><div class="icon">Take</div><div class="label">Quiz</div></div>
+  <div class="flow-arrow">-></div>
+  <div class="flow-step"><div class="icon">Result</div><div class="label">Score</div></div>
+  <div class="flow-arrow">-></div>
+  <div class="flow-step"><div class="icon">History</div><div class="label">Review</div></div>
+</div>
+
+<!-- ===== DATA FLOW ===== -->
+<h2>Data Flow</h2>
+
+<h3>Article Ingestion (Daily Cron)</h3>
+<div class="pipe">
+  <div class="pipe-step"><div class="icon">RSS</div><div class="label">The Hindu + IE</div></div>
+  <div class="pipe-arr">-></div>
+  <div class="pipe-step"><div class="icon">Scrape</div><div class="label">Python</div></div>
+  <div class="pipe-arr">-></div>
+  <div class="pipe-step"><div class="icon">NIM</div><div class="label">Summarize</div></div>
+  <div class="pipe-arr">-></div>
+  <div class="pipe-step"><div class="icon">Tag</div><div class="label">Syllabus</div></div>
+  <div class="pipe-arr">-></div>
+  <div class="pipe-step"><div class="icon">Save</div><div class="label">Supabase</div></div>
+</div>
+
+<h3>Quiz Generation (On Demand — with Caching)</h3>
+<div class="pipe">
+  <div class="pipe-step"><div class="icon">User</div><div class="label">Selects articles</div></div>
+  <div class="pipe-arr">-></div>
+  <div class="pipe-step"><div class="icon">Hash</div><div class="label">MD5(article IDs)</div></div>
+  <div class="pipe-arr">-></div>
+  <div class="pipe-step"><div class="icon">DB Check</div><div class="label">Quiz exists?</div></div>
+  <div class="pipe-arr">-></div>
+  <div class="pipe-step" style="background:#05966920;border-radius:8px;padding:0.5rem;">
+    <div class="icon">CACHE HIT</div>
+    <div class="label" style="color:#6ee7b7;">Return from DB</div>
+  </div>
+  <div class="pipe-arr">-OR-></div>
+  <div class="pipe-step" style="background:#a78bfa20;border-radius:8px;padding:0.5rem;">
+    <div class="icon">CACHE MISS</div>
+    <div class="label" style="color:#a78bfa;">Call LLM + Save</div>
+  </div>
+  <div class="pipe-arr">-></div>
+  <div class="pipe-step"><div class="icon">Show</div><div class="label">Quiz UI</div></div>
+</div>
+
+<div class="note">
+  <strong>Quiz Caching:</strong> Quizzes are keyed by <code>article_set_hash</code> (MD5 of sorted article IDs). 
+  If any user has previously generated a quiz for the same set of articles, we serve it from DB — 
+  <strong>zero LLM cost</strong> for repeat generations. The LLM is only called on first-ever generation 
+  for a given article combination.
+</div>
+
+<h3>Fine-Tuning Pipeline (Admin Triggered)</h3>
+<div class="pipe">
+  <div class="pipe-step"><div class="icon">Collect</div><div class="label">AI interactions</div></div>
+  <div class="pipe-arr">-></div>
+  <div class="pipe-step"><div class="icon">Filter</div><div class="label">Admin approves</div></div>
+  <div class="pipe-arr">-></div>
+  <div class="pipe-step"><div class="icon">Align</div><div class="label">Alpaca format</div></div>
+  <div class="pipe-arr">-></div>
+  <div class="pipe-step"><div class="icon">Colab</div><div class="label">LoRA train</div></div>
+  <div class="pipe-arr">-></div>
+  <div class="pipe-step"><div class="icon">HF Hub</div><div class="label">Push adapter</div></div>
+  <div class="pipe-arr">-></div>
+  <div class="pipe-step"><div class="icon">Config</div><div class="label">Update registry</div></div>
+  <div class="pipe-arr">-></div>
+  <div class="pipe-step"><div class="icon">Deploy</div><div class="label">New model live</div></div>
+</div>
+
+<!-- ===== FRONTEND ROUTES ===== -->
+<h2>Frontend Routes (Next.js App Router)</h2>
+<div class="grid-2">
+  <div class="card"><h4>User Routes</h4><ul><li>/ — News Feed (default)</li><li>/quiz — Select articles, generate quiz</li><li>/quiz/[id] — Take a quiz</li><li>/history — Past quizzes list</li><li>/history/[id] — Quiz detail + linked articles</li><li>/login, /register — Auth pages</li></ul></div>
+  <div class="card"><h4>Admin Routes</h4><ul><li>/admin — Dashboard</li><li>/admin/training-data — Browse AI interactions</li><li>/admin/datasets — Build + manage datasets</li><li>/admin/models — Model registry manager</li></ul></div>
+</div>
+
+<!-- ===== BACKEND API ===== -->
+<h2>Backend API (FastAPI)</h2>
+<div class="grid-2">
+  <div class="card"><h4>Auth Endpoints</h4><ul><li>POST /api/auth/register</li><li>POST /api/auth/login</li><li>GET /api/auth/me</li></ul></div>
+  <div class="card"><h4>Article Endpoints</h4><ul><li>GET /api/articles — List (filter by date/source/topic)</li><li>GET /api/articles/[id] — Detail</li></ul></div>
+  <div class="card"><h4>Quiz Endpoints</h4><ul><li>POST /api/quizzes/generate — Create quiz from article IDs</li><li>GET /api/quizzes/[id] — Get quiz questions</li><li>POST /api/quizzes/[id]/submit — Submit answers</li><li>GET /api/history — User's past quizzes</li><li>GET /api/history/[id] — Quiz detail</li></ul></div>
+  <div class="card"><h4>Admin Endpoints</h4><ul><li>GET /api/admin/interactions — List AI interactions</li><li>PUT /api/admin/interactions/[id] — Edit/rate</li><li>POST /api/admin/datasets — Build dataset</li><li>GET /api/admin/models — Model registry</li><li>PUT /api/admin/models — Swap model</li></ul></div>
+</div>
+
+<!-- ===== TECH STACK ===== -->
+<h2>Zero-Cost Tech Stack</h2>
+<div class="grid-4">
+  <div class="card"><h4>Frontend</h4><ul><li>Next.js 14</li><li>TailwindCSS</li><li>TypeScript</li><li>NextAuth.js</li></ul></div>
+  <div class="card"><h4>Backend</h4><ul><li>Python FastAPI</li><li>SQLAlchemy</li><li>Alembic</li><li>Celery (async)</li></ul></div>
+  <div class="card"><h4>Data</h4><ul><li>Supabase (Postgres)</li><li>pgvector ext.</li><li>Upstash Redis</li></ul></div>
+  <div class="card"><h4>AI</h4><ul><li>NVIDIA NIM API</li><li>Google Colab (T4)</li><li>Hugging Face Hub</li></ul></div>
+  <div class="card"><h4>Hosting</h4><ul><li>Vercel (frontend)</li><li>Render (backend)</li></ul></div>
+  <div class="card"><h4>CI/CD</h4><ul><li>GitHub Actions</li></ul></div>
+  <div class="card"><h4>Domain</h4><ul><li>vercel.app (free)</li><li>or Render subdomain</li></ul></div>
+  <div class="card"><h4>Fine-Tuning</h4><ul><li>QLoRA 4-bit</li><li>Colab Notebooks</li><li>HF Hub storage</li></ul></div>
+</div>
+
+<!-- ===== WHY ZERO COST WORKS ===== -->
+<div class="note">
+  <strong>How this stays free at scale (for a while):</strong><br>
+  - Vercel free: 100GB bandwidth ~ 50K page views/month<br>
+  - Supabase free: 500MB DB ~ 10K articles + AI interactions<br>
+  - NVIDIA NIM free: 1K requests/day ~ enough for 50 daily articles + user quizzes<br>
+  - Render free: Auto-sleeps when idle, wakes on request (5-10s cold start)<br>
+  - Colab free: 12-15 GPU hours/week for periodic fine-tuning<br>
+  - When you hit limits: Upgrade only what's needed (e.g., Supabase Pro $25/mo)
+</div>
+
+</body>
+</html>

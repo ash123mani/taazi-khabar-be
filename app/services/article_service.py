@@ -176,7 +176,7 @@ async def bulk_upsert_articles(
 async def list_articles(
     db: AsyncSession,
     skip: int = 0,
-    limit: int = 20,
+    limit: int | None = None,
     source: str | None = None,
     category_id: UUID | None = None,
     article_date: date | None = None,
@@ -206,7 +206,9 @@ async def list_articles(
     count_result = await db.execute(count_query)
     total = len(count_result.scalars().all())
 
-    query = query.offset(skip).limit(limit)
+    query = query.offset(skip)
+    if limit is not None:
+        query = query.limit(limit)
     result = await db.execute(query)
     articles = list(result.scalars().all())
 
