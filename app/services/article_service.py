@@ -102,9 +102,17 @@ async def bulk_upsert_articles(
     ])
 
     # Phase 4: apply summaries to DB (sequential)
+    cat_result = await db.execute(select(Category).where(Category.name == "Uncategorized"))
+    unknown_cat = cat_result.scalar_one_or_none()
+    if not unknown_cat:
+        unknown_cat = Category(name="Uncategorized", description="Articles without a specific category")
+        db.add(unknown_cat)
+        await db.flush()
+
     created = 0
     for (art, _), summary in zip(created_articles, summary_results):
         if not summary:
+            art.category_id = unknown_cat.id
             continue
         art.gk_summary = summary.get("gk_gist")
         art.syllabus_tag = summary.get("syllabus_topic")
@@ -115,8 +123,9 @@ async def bulk_upsert_articles(
                 select(Category).where(Category.name.ilike(cat_name.strip()))
             )
             cat_obj = cat.scalar_one_or_none()
-            if cat_obj:
-                art.category_id = cat_obj.id
+            art.category_id = cat_obj.id if cat_obj else unknown_cat.id
+        else:
+            art.category_id = unknown_cat.id
         created += 1
 
     # Phase 5: parallel question generation for summarized articles

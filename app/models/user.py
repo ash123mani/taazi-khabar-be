@@ -1,7 +1,7 @@
 from uuid import uuid4, UUID
 from datetime import datetime
 
-from sqlalchemy import Column, String, Boolean, DateTime
+from sqlalchemy import Column, String, Boolean, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.sql import func
 
@@ -13,7 +13,9 @@ class User(Base):
 
     id: UUID = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     email: str = Column(String(255), unique=True, nullable=False, index=True)
-    password_hash: str = Column(String(255), nullable=False)
+    password_hash: str = Column(String(255), nullable=True)
     name: str = Column(String(100), nullable=True)
+    google_id: str = Column(String(255), unique=True, nullable=True)
+    avatar_url: str = Column(Text, nullable=True)
     is_admin: bool = Column(Boolean, default=False)
     created_at: datetime = Column(DateTime(timezone=True), server_default=func.now())

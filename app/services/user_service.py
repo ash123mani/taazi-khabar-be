@@ -45,10 +45,43 @@ async def create_user(db: AsyncSession, email: str, password: str, name: str | N
 async def authenticate_user(db: AsyncSession, email: str, password: str) -> tuple[User, str] | None:
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
-    if user is None or not _verify_password(password, user.password_hash):
+    if user is None or not user.password_hash or not _verify_password(password, user.password_hash):
         return None
     token = _create_token(user.id)
     return user, token
+
+
+async def find_or_create_google_user(
+    db: AsyncSession,
+    email: str,
+    google_id: str,
+    name: str | None = None,
+    avatar_url: str | None = None,
+) -> User:
+    existing = await db.execute(select(User).where(User.google_id == google_id))
+    user = existing.scalar_one_or_none()
+    if user:
+        return user
+
+    existing_email = await db.execute(select(User).where(User.email == email))
+    user = existing_email.scalar_one_or_none()
+    if user:
+        user.google_id = google_id
+        user.avatar_url = avatar_url or user.avatar_url
+        user.name = name or user.name
+        await db.flush()
+        return user
+
+    user = User(
+        email=email,
+        google_id=google_id,
+        name=name,
+        avatar_url=avatar_url,
+        password_hash=None,
+    )
+    db.add(user)
+    await db.flush()
+    return user
 
 
 async def get_user_by_id(db: AsyncSession, user_id: UUID) -> User | None:

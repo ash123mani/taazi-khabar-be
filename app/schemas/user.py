@@ -15,11 +15,19 @@ class UserLoginRequest(BaseModel):
     password: str
 
 
+class GoogleAuthRequest(BaseModel):
+    email: str
+    name: str | None = None
+    google_id: str
+    avatar_url: str | None = None
+
+
 class UserResponse(BaseModel):
     id: UUID
     email: str
     name: str | None
     is_admin: bool
+    avatar_url: str | None
     created_at: datetime
 
     class Config:

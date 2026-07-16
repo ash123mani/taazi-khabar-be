@@ -95,12 +95,15 @@ async def run():
         logger.info("--- Scraping %s ---", name)
         t0 = time.time()
         try:
-            articles = await scraper_cls().scrape()
+            articles = await asyncio.wait_for(scraper_cls().scrape(), timeout=900)
             elapsed = time.time() - t0
             logger.info("  %s: %d articles fetched in %.1fs", name, len(articles), elapsed)
             for a in articles:
                 logger.info("  · [%s] %s", a.source, a.headline[:100])
             return articles, None
+        except asyncio.TimeoutError:
+            logger.error("  %s TIMEOUT after 900s", name)
+            return [], f"{name}: timeout"
         except Exception as e:
             logger.error("  %s FAILED: %s", name, e)
             return [], f"{name}: {e}"

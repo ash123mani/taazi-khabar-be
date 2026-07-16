@@ -87,34 +87,42 @@ class BaseScraper(ABC):
         async def process_entry(entry: dict) -> ScrapedArticle | None:
             async with sem:
                 await asyncio.sleep(self.rate_limit_delay)
-                async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-                    # Single fetch: extract og:image from same response
-                    try:
-                        resp = await client.get(
-                            entry["link"],
-                            headers={"User-Agent": "Mozilla/5.0 (compatible; TaaziKhabar/1.0)"},
+                try:
+                    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+                        try:
+                            resp = await asyncio.wait_for(
+                                client.get(
+                                    entry["link"],
+                                    headers={"User-Agent": "Mozilla/5.0 (compatible; TaaziKhabar/1.0)"},
+                                ),
+                                timeout=30,
+                            )
+                            resp.raise_for_status()
+                        except (httpx.HTTPError, asyncio.TimeoutError):
+                            return None
+
+                        raw_html = resp.text
+                        body = await asyncio.wait_for(
+                            asyncio.get_running_loop().run_in_executor(None, self._extract_body_from_html, raw_html),
+                            timeout=15,
                         )
-                        resp.raise_for_status()
-                    except httpx.HTTPError:
-                        return None
+                        if not body:
+                            return None
 
-                    raw_html = resp.text
-                    body = self._extract_body_from_html(raw_html)
-                    if not body:
-                        return None
+                        image_url = entry.get("image_url")
+                        if not image_url:
+                            image_url = self._extract_og_image(raw_html, entry["link"])
 
-                    image_url = entry.get("image_url")
-                    if not image_url:
-                        image_url = self._extract_og_image(raw_html, entry["link"])
-
-                    return ScrapedArticle(
-                        source=self.__class__.__name__.lower().replace("scraper", ""),
-                        headline=entry["title"],
-                        body_text=body,
-                        url=entry["link"],
-                        published_at=entry["published"],
-                        image_url=image_url,
-                    )
+                        return ScrapedArticle(
+                            source=self.__class__.__name__.lower().replace("scraper", ""),
+                            headline=entry["title"],
+                            body_text=body,
+                            url=entry["link"],
+                            published_at=entry["published"],
+                            image_url=image_url,
+                        )
+                except (asyncio.TimeoutError, httpx.HTTPError):
+                    return None
 
         results = await asyncio.gather(*[process_entry(e) for e in entries])
         return [r for r in results if r is not None]
