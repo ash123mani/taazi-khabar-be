@@ -8,7 +8,7 @@ class IndianExpressScraper(BaseScraper):
     def __init__(self) -> None:
         super().__init__(
             rss_url="https://indianexpress.com/feed/",
-            rate_limit_delay=1.0,
+            rate_limit_delay=0.5,
         )
 
     def _extract_body_from_html(self, html: str) -> str:

@@ -44,7 +44,6 @@ async def bulk_upsert_articles(
     if not new_articles:
         return 0, skipped, [], 0, []
 
-    sem = asyncio.Semaphore(5)
     errors: List[str] = []
 
     # Phase 1: parallel filter
@@ -53,11 +52,10 @@ async def bulk_upsert_articles(
             return True
         if a.source == "pib":
             return True
-        async with sem:
-            try:
-                return await article_filter(headline=a.headline, body_text=a.body_text)
-            except Exception:
-                return False
+        try:
+            return await article_filter(headline=a.headline, body_text=a.body_text)
+        except Exception:
+            return False
 
     filter_results = await asyncio.gather(*[check_article(a) for a in new_articles])
     filtered_articles = [a for a, ok in zip(new_articles, filter_results) if ok]
@@ -90,12 +88,11 @@ async def bulk_upsert_articles(
     async def summarize_one(a: ScrapedArticle) -> dict | None:
         if not summarizer:
             return None
-        async with sem:
-            try:
-                return await summarizer(a.body_text)
-            except Exception as e:
-                errors.append(f"Summarization failed for {a.url}: {e}")
-                return None
+        try:
+            return await summarizer(a.body_text)
+        except Exception as e:
+            errors.append(f"Summarization failed for {a.url}: {e}")
+            return None
 
     summary_results = await asyncio.gather(*[
         summarize_one(a) for _, a in created_articles
@@ -135,18 +132,17 @@ async def bulk_upsert_articles(
     ) -> list[dict]:
         if not question_setter or not art.gk_summary:
             return []
-        async with sem:
-            try:
-                return await question_setter(
-                    article_id=art.id,
-                    headline=art.headline,
-                    summary=art.gk_summary,
-                    syllabus_tag=art.syllabus_tag,
-                    key_terms=art.key_terms,
-                )
-            except Exception as e:
-                errors.append(f"Question generation failed for {art.headline[:60]}: {e}")
-                return []
+        try:
+            return await question_setter(
+                article_id=art.id,
+                headline=art.headline,
+                summary=art.gk_summary,
+                syllabus_tag=art.syllabus_tag,
+                key_terms=art.key_terms,
+            )
+        except Exception as e:
+            errors.append(f"Question generation failed for {art.headline[:60]}: {e}")
+            return []
 
     if question_setter:
         q_articles: list[Article] = []

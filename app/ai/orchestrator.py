@@ -12,7 +12,10 @@ from app.config import settings
 
 class AIOrchestrator:
     def __init__(self) -> None:
-        self._provider = NIMProvider()
+        self._providers = {
+            persona: NIMProvider(*settings.get_persona_credentials(persona))
+            for persona in ["summarizer", "article_filter", "question_setter"]
+        }
 
     async def summarize_article(
         self,
@@ -24,15 +27,12 @@ class AIOrchestrator:
         model_config = registry.get_active_model("summarizer")
         if model_config is None:
             raise ValueError("No active model configured for summarizer")
-        api_key, base_url = settings.get_persona_credentials("summarizer")
 
         system, prompt = summarizer.build_prompt(article_body)
-        response = await self._provider.complete(
+        response = await self._providers["summarizer"].complete(
             prompt=prompt,
             system=system,
             model=model_config.name,
-            api_key=api_key,
-            base_url=base_url,
             max_tokens=model_config.max_tokens,
             temperature=model_config.temperature,
             top_p=model_config.top_p,
@@ -66,15 +66,12 @@ class AIOrchestrator:
         model_config = registry.get_active_model("article_filter")
         if model_config is None:
             return True
-        api_key, base_url = settings.get_persona_credentials("article_filter")
 
         system, prompt = article_filter.build_prompt(headline, body_text)
-        response = await self._provider.complete(
+        response = await self._providers["article_filter"].complete(
             prompt=prompt,
             system=system,
             model=model_config.name,
-            api_key=api_key,
-            base_url=base_url,
             max_tokens=model_config.max_tokens,
             temperature=model_config.temperature,
             top_p=model_config.top_p,
@@ -105,15 +102,12 @@ class AIOrchestrator:
         model_config = registry.get_active_model("question_setter")
         if model_config is None:
             raise ValueError("No active model configured for question_setter")
-        api_key, base_url = settings.get_persona_credentials("question_setter")
 
         system, prompt = question_setter.build_prompt(articles, num_questions)
-        response = await self._provider.complete(
+        response = await self._providers["question_setter"].complete(
             prompt=prompt,
             system=system,
             model=model_config.name,
-            api_key=api_key,
-            base_url=base_url,
             max_tokens=model_config.max_tokens,
             temperature=model_config.temperature,
             top_p=model_config.top_p,

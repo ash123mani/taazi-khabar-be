@@ -9,13 +9,12 @@ from app.config import settings
 
 
 class NIMProvider(BaseProvider):
-    _semaphore = asyncio.Semaphore(5)
-    _last_request_time = 0.0
-    _rate_limit_lock = asyncio.Lock()
-
-    def __init__(self) -> None:
-        self.base_url = settings.nvidia_nim_base_url
-        self.api_key = settings.nvidia_api_key.get_secret_value()
+    def __init__(self, api_key: str = "", base_url: str = "") -> None:
+        self._semaphore = asyncio.Semaphore(5)
+        self._last_request_time = 0.0
+        self._rate_limit_lock = asyncio.Lock()
+        self.base_url = base_url or settings.nvidia_nim_base_url
+        self.api_key = api_key or settings.nvidia_api_key.get_secret_value()
         self._client: httpx.AsyncClient | None = None
         self._current_base_url: str = ""
 

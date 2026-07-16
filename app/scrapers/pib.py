@@ -44,7 +44,7 @@ class PibScraper(BaseScraper):
 
     async def scrape(self) -> list[ScrapedArticle]:
         entries = await self.fetch_rss()
-        sem = asyncio.Semaphore(3)
+        sem = asyncio.Semaphore(5)
 
         async def process_entry(entry: dict) -> ScrapedArticle | None:
             async with sem:
