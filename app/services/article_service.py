@@ -41,12 +41,23 @@ async def bulk_upsert_articles(
     existing_urls = {row[0] for row in existing.fetchall()}
 
     new_articles = [a for a in articles if a.url not in existing_urls]
-    skipped = len(articles) - len(new_articles)
+    skipped_articles = [a for a in articles if a.url in existing_urls]
+    skipped = len(skipped_articles)
 
-    if not new_articles:
+    if not new_articles and not skipped_articles:
+        return 0, skipped, [], 0, []
+    if not new_articles and not summarizer:
         return 0, skipped, [], 0, []
 
     errors: List[str] = []
+
+    # Ensure Uncategorized category exists (needed for both new and re-summarized articles)
+    cat_result = await db.execute(select(Category).where(Category.name == "Uncategorized"))
+    unknown_cat = cat_result.scalar_one_or_none()
+    if not unknown_cat:
+        unknown_cat = Category(name="Uncategorized", description="Articles without a specific category")
+        db.add(unknown_cat)
+        await db.flush()
 
     # Phase 1: parallel filter
     async def check_article(a: ScrapedArticle) -> bool:
@@ -67,123 +78,162 @@ async def bulk_upsert_articles(
     filtered_out = sum(1 for ok in filter_results if not ok)
     filtered_headlines = [a.headline for a, ok in zip(new_articles, filter_results) if not ok]
 
-    if not filtered_articles:
+    has_new_articles = bool(filtered_articles)
+    if not has_new_articles and not skipped_articles:
         return 0, skipped, errors, filtered_out, filtered_headlines
 
-    # Phase 2: batch insert with ON CONFLICT DO NOTHING
-    # Prevents UniqueViolationError race between URL check and insert
-    stmt = insert(Article).values([
-        {
-            "source": a.source, "headline": a.headline, "body_text": a.body_text,
-            "url": a.url, "published_at": _parse_rss_date(a.published_at),
-            "image_url": a.image_url,
-        }
-        for a in filtered_articles
-    ]).on_conflict_do_nothing(constraint="articles_url_key")
-    await db.execute(stmt)
-    await db.flush()
-
-    # Query back the successfully inserted articles for use in subsequent phases
-    urls = [a.url for a in filtered_articles]
-    result = await db.execute(select(Article).where(Article.url.in_(urls)))
-    art_map = {art.url: art for art in result.scalars().all()}
-    created_articles = [(art_map[a.url], a) for a in filtered_articles if a.url in art_map]
-
-    # Phase 3: parallel summarize (no db passed — logging skipped for speed)
-    async def summarize_one(a: ScrapedArticle) -> dict | None:
-        if not summarizer:
-            return None
-        try:
-            return await asyncio.wait_for(
-                summarizer(a.body_text),
-                timeout=_AI_TIMEOUT,
-            )
-        except Exception as e:
-            errors.append(f"Summarization failed for {a.url}: {e}")
-            return None
-
-    summary_results = await asyncio.gather(*[
-        summarize_one(a) for _, a in created_articles
-    ])
-
-    # Phase 4: apply summaries to DB (sequential)
-    cat_result = await db.execute(select(Category).where(Category.name == "Uncategorized"))
-    unknown_cat = cat_result.scalar_one_or_none()
-    if not unknown_cat:
-        unknown_cat = Category(name="Uncategorized", description="Articles without a specific category")
-        db.add(unknown_cat)
-        await db.flush()
-
+    # Phase 2-5: process new articles (only if any passed the filter)
     created = 0
-    for (art, _), summary in zip(created_articles, summary_results):
-        if not summary:
-            art.category_id = unknown_cat.id
-            continue
-        art.gk_summary = summary.get("gk_gist")
-        art.syllabus_tag = summary.get("syllabus_topic")
-        art.key_terms = summary.get("key_terms")
-        cat_name = summary.get("category")
-        if cat_name:
-            cat = await db.execute(
-                select(Category).where(Category.name.ilike(cat_name.strip()))
-            )
-            cat_obj = cat.scalar_one_or_none()
-            art.category_id = cat_obj.id if cat_obj else unknown_cat.id
-        else:
-            art.category_id = unknown_cat.id
-        created += 1
-
-    # Phase 5: parallel question generation for summarized articles
-    async def gen_questions(
-        art: Article,
-        article_body: str,
-    ) -> list[dict]:
-        if not question_setter or not art.gk_summary:
-            return []
-        try:
-            return await asyncio.wait_for(
-                question_setter(
-                    article_id=art.id,
-                    headline=art.headline,
-                    summary=art.gk_summary,
-                    syllabus_tag=art.syllabus_tag,
-                    key_terms=art.key_terms,
-                ),
-                timeout=_AI_TIMEOUT,
-            )
-        except Exception as e:
-            errors.append(f"Question generation failed for {art.headline[:60]}: {e}")
-            return []
-
-    if question_setter:
-        q_articles: list[Article] = []
-        q_coros = []
-        for art, orig in created_articles:
-            if art.gk_summary:
-                q_articles.append(art)
-                q_coros.append(gen_questions(art, orig.body_text))
-        if q_coros:
-            question_results = await asyncio.gather(*q_coros)
-            for art, questions in zip(q_articles, question_results):
-                if not questions:
-                    continue
-                existing = await db.execute(
-                    select(CachedQuestion.id)
-                    .where(CachedQuestion.article_id == art.id)
-                    .limit(1)
-                )
-                if existing.scalar_one_or_none() is not None:
-                    continue
-                for q in questions:
-                    db.add(CachedQuestion(
-                        article_id=art.id,
-                        question_text=q["question_text"],
-                        options=q["options"],
-                        correct_answer=q["correct_answer"],
-                        explanation=q.get("explanation"),
-                        difficulty=q.get("difficulty"),
-                    ))
+    if has_new_articles:
+        # Phase 2: batch insert with ON CONFLICT DO NOTHING
+        # Prevents UniqueViolationError race between URL check and insert
+        stmt = insert(Article).values([
+            {
+                "source": a.source, "headline": a.headline, "body_text": a.body_text,
+                "url": a.url, "published_at": _parse_rss_date(a.published_at),
+                "image_url": a.image_url,
+            }
+            for a in filtered_articles
+        ]).on_conflict_do_nothing(constraint="articles_url_key")
+        await db.execute(stmt)
         await db.flush()
+
+        # Query back the successfully inserted articles for use in subsequent phases
+        urls = [a.url for a in filtered_articles]
+        result = await db.execute(select(Article).where(Article.url.in_(urls)))
+        art_map = {art.url: art for art in result.scalars().all()}
+        created_articles = [(art_map[a.url], a) for a in filtered_articles if a.url in art_map]
+
+        # Phase 3: parallel summarize (no db passed — logging skipped for speed)
+        async def summarize_one(a: ScrapedArticle) -> dict | None:
+            if not summarizer:
+                return None
+            try:
+                return await asyncio.wait_for(
+                    summarizer(a.body_text),
+                    timeout=_AI_TIMEOUT,
+                )
+            except Exception as e:
+                errors.append(f"Summarization failed for {a.url}: {e}")
+                return None
+
+        summary_results = await asyncio.gather(*[
+            summarize_one(a) for _, a in created_articles
+        ])
+
+        # Phase 4: apply summaries to DB (sequential)
+        for (art, _), summary in zip(created_articles, summary_results):
+            if not summary:
+                art.category_id = unknown_cat.id
+                continue
+            art.gk_summary = summary.get("gk_gist")
+            art.syllabus_tag = summary.get("syllabus_topic")
+            art.key_terms = summary.get("key_terms")
+            cat_name = summary.get("category")
+            if cat_name:
+                cat = await db.execute(
+                    select(Category).where(Category.name.ilike(cat_name.strip()))
+                )
+                cat_obj = cat.scalar_one_or_none()
+                art.category_id = cat_obj.id if cat_obj else unknown_cat.id
+            else:
+                art.category_id = unknown_cat.id
+            created += 1
+
+        # Phase 5: parallel question generation for summarized articles
+        async def gen_questions(
+            art: Article,
+            article_body: str,
+        ) -> list[dict]:
+            if not question_setter or not art.gk_summary:
+                return []
+            try:
+                return await asyncio.wait_for(
+                    question_setter(
+                        article_id=art.id,
+                        headline=art.headline,
+                        summary=art.gk_summary,
+                        syllabus_tag=art.syllabus_tag,
+                        key_terms=art.key_terms,
+                    ),
+                    timeout=_AI_TIMEOUT,
+                )
+            except Exception as e:
+                errors.append(f"Question generation failed for {art.headline[:60]}: {e}")
+                return []
+
+        if question_setter:
+            q_articles: list[Article] = []
+            q_coros = []
+            for art, orig in created_articles:
+                if art.gk_summary:
+                    q_articles.append(art)
+                    q_coros.append(gen_questions(art, orig.body_text))
+            if q_coros:
+                question_results = await asyncio.gather(*q_coros)
+                for art, questions in zip(q_articles, question_results):
+                    if not questions:
+                        continue
+                    existing = await db.execute(
+                        select(CachedQuestion.id)
+                        .where(CachedQuestion.article_id == art.id)
+                        .limit(1)
+                    )
+                    if existing.scalar_one_or_none() is not None:
+                        continue
+                    for q in questions:
+                        db.add(CachedQuestion(
+                            article_id=art.id,
+                            question_text=q["question_text"],
+                            options=q["options"],
+                            correct_answer=q["correct_answer"],
+                            explanation=q.get("explanation"),
+                            difficulty=q.get("difficulty"),
+                        ))
+            await db.flush()
+
+    # Phase 6: re-summarize previously skipped articles that lack summaries
+    if summarizer and skipped_articles:
+        skipped_urls = [a.url for a in skipped_articles]
+        result = await db.execute(
+            select(Article).where(
+                Article.url.in_(skipped_urls),
+                Article.gk_summary.is_(None),
+            )
+        )
+        needs_summary = result.scalars().all()
+        if needs_summary:
+            url_to_scraped = {a.url: a for a in skipped_articles}
+            async def resummarize(art: Article) -> dict | None:
+                scraped = url_to_scraped.get(art.url)
+                if not scraped:
+                    return None
+                try:
+                    return await asyncio.wait_for(
+                        summarizer(scraped.body_text),
+                        timeout=_AI_TIMEOUT,
+                    )
+                except Exception as e:
+                    errors.append(f"Re-summarization failed for {art.url}: {e}")
+                    return None
+
+            resummary_results = await asyncio.gather(*[
+                resummarize(art) for art in needs_summary
+            ])
+            for art, summary in zip(needs_summary, resummary_results):
+                if not summary:
+                    continue
+                art.gk_summary = summary.get("gk_gist")
+                art.syllabus_tag = summary.get("syllabus_topic")
+                art.key_terms = summary.get("key_terms")
+                cat_name = summary.get("category")
+                if cat_name:
+                    cat = await db.execute(
+                        select(Category).where(Category.name.ilike(cat_name.strip()))
+                    )
+                    cat_obj = cat.scalar_one_or_none()
+                    art.category_id = cat_obj.id if cat_obj else unknown_cat.id
+                created += 1
 
     await db.commit()
     return created, skipped, errors, filtered_out, filtered_headlines
