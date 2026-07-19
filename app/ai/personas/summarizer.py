@@ -15,6 +15,8 @@ def _load_template() -> dict[str, str]:
 def build_prompt(article_body: str) -> tuple[str, str]:
     template = _load_template()
     system = template["system"]
+    if len(article_body) > 5000:
+        article_body = article_body[:5000] + "\n\n[Article truncated for length...]"
     prompt = template["prompt_template"].format(article_body=article_body)
     return system, prompt
 

@@ -10,7 +10,7 @@ from app.config import settings
 
 class NIMProvider(BaseProvider):
     def __init__(self, api_key: str = "", base_url: str = "") -> None:
-        self._semaphore = asyncio.Semaphore(5)
+        self._semaphore = asyncio.Semaphore(10)
         self._last_request_time = 0.0
         self._rate_limit_lock = asyncio.Lock()
         self.base_url = base_url or settings.nvidia_nim_base_url
@@ -19,7 +19,7 @@ class NIMProvider(BaseProvider):
         self._current_base_url: str = ""
 
     async def _throttle(self) -> None:
-        min_interval = 1.5  # 40 RPM = 1 per 1.5s
+        min_interval = 2.0
         async with self._rate_limit_lock:
             now = time.monotonic()
             since_last = now - self._last_request_time
@@ -30,24 +30,35 @@ class NIMProvider(BaseProvider):
     async def _get_client(self, base_url: str = "") -> httpx.AsyncClient:
         url = base_url or self.base_url
         if self._client is None or url != self._current_base_url:
-            self._client = httpx.AsyncClient(base_url=url, timeout=300.0)
+            self._client = httpx.AsyncClient(base_url=url, timeout=60.0)
             self._current_base_url = url
         return self._client
 
     async def _request_with_retry(
         self, client: httpx.AsyncClient, payload: dict, headers: dict,
     ) -> ProviderResponse:
-        for attempt in range(3):
+        last_exc: Exception | None = None
+        for attempt in range(5):
             await self._throttle()
             start = time.monotonic()
-            response = await client.post("/chat/completions", json=payload, headers=headers)
+            try:
+                response = await client.post("/chat/completions", json=payload, headers=headers)
+            except (httpx.TimeoutException, httpx.NetworkError) as e:
+                last_exc = e
+                if attempt < 4:
+                    await asyncio.sleep(2 ** (attempt + 1))
+                    continue
+                raise
             elapsed = (time.monotonic() - start) * 1000.0
-            if response.status_code == 429 and attempt < 2:
+            if response.status_code == 429 and attempt < 4:
                 try:
                     retry_after = float(response.headers.get("Retry-After", "5"))
                 except (ValueError, TypeError):
                     retry_after = 5
                 await asyncio.sleep(retry_after * (2 ** attempt))
+                continue
+            if response.status_code >= 500 and attempt < 4:
+                await asyncio.sleep(2 ** (attempt + 1))
                 continue
             response.raise_for_status()
             data = response.json()
@@ -56,7 +67,7 @@ class NIMProvider(BaseProvider):
                 tokens_used=data.get("usage", {}).get("total_tokens", 0),
                 latency_ms=elapsed,
             )
-        raise RuntimeError("Rate-limited after 3 retries")
+        raise RuntimeError("Rate-limited after 5 retries")
 
     async def complete(
         self,

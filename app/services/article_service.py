@@ -15,6 +15,8 @@ from app.models.quiz import QuizArticle
 from app.models.cached_question import CachedQuestion
 from app.scrapers.base import ScrapedArticle
 
+_AI_TIMEOUT = 300.0  # max seconds per individual AI call
+
 
 def _parse_rss_date(date_str: str) -> datetime:
     try:
@@ -53,7 +55,10 @@ async def bulk_upsert_articles(
         if a.source == "pib":
             return True
         try:
-            return await article_filter(headline=a.headline, body_text=a.body_text)
+            return await asyncio.wait_for(
+                article_filter(headline=a.headline, body_text=a.body_text),
+                timeout=_AI_TIMEOUT,
+            )
         except Exception:
             return False
 
@@ -89,7 +94,10 @@ async def bulk_upsert_articles(
         if not summarizer:
             return None
         try:
-            return await summarizer(a.body_text)
+            return await asyncio.wait_for(
+                summarizer(a.body_text),
+                timeout=_AI_TIMEOUT,
+            )
         except Exception as e:
             errors.append(f"Summarization failed for {a.url}: {e}")
             return None
@@ -133,12 +141,15 @@ async def bulk_upsert_articles(
         if not question_setter or not art.gk_summary:
             return []
         try:
-            return await question_setter(
-                article_id=art.id,
-                headline=art.headline,
-                summary=art.gk_summary,
-                syllabus_tag=art.syllabus_tag,
-                key_terms=art.key_terms,
+            return await asyncio.wait_for(
+                question_setter(
+                    article_id=art.id,
+                    headline=art.headline,
+                    summary=art.gk_summary,
+                    syllabus_tag=art.syllabus_tag,
+                    key_terms=art.key_terms,
+                ),
+                timeout=_AI_TIMEOUT,
             )
         except Exception as e:
             errors.append(f"Question generation failed for {art.headline[:60]}: {e}")
