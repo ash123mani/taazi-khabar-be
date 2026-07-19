@@ -19,7 +19,7 @@ class NIMProvider(BaseProvider):
         self._current_base_url: str = ""
 
     async def _throttle(self) -> None:
-        min_interval = 3.0
+        min_interval = 6.0
         async with self._rate_limit_lock:
             now = time.monotonic()
             since_last = now - self._last_request_time
