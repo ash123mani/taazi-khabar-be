@@ -15,7 +15,7 @@ from app.models.quiz import QuizArticle
 from app.models.cached_question import CachedQuestion
 from app.scrapers.base import ScrapedArticle
 
-_AI_TIMEOUT = 300.0  # max seconds per individual AI call
+_AI_TIMEOUT = 600.0  # max seconds per individual AI call
 
 
 def _parse_rss_date(date_str: str) -> datetime:
