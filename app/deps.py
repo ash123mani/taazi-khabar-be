@@ -11,6 +11,7 @@ from app.config import settings
 from app.models.user import User
 
 security = HTTPBearer()
+optional_security = HTTPBearer(auto_error=False)
 
 
 def get_async_session_factory(request: Request):
@@ -52,14 +53,7 @@ async def get_current_user(
     return user
 
 
-async def get_optional_user(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-) -> User | None:
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        return None
-    token = auth_header[len("Bearer "):]
+async def _resolve_user_from_token(token: str, db: AsyncSession) -> User | None:
     try:
         payload = jwt.decode(token, settings.nextauth_secret.get_secret_value(), algorithms=["HS256"])
         user_id = payload.get("sub")
@@ -67,9 +61,17 @@ async def get_optional_user(
             return None
     except JWTError:
         return None
-
     result = await db.execute(select(User).where(User.id == UUID(user_id)))
     return result.scalar_one_or_none()
+
+
+async def get_optional_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(optional_security),
+    db: AsyncSession = Depends(get_db),
+) -> User | None:
+    if credentials is None:
+        return None
+    return await _resolve_user_from_token(credentials.credentials, db)
 
 
 async def get_admin_user(
