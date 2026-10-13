@@ -25,14 +25,3 @@ class BaseProvider(ABC):
         presence_penalty: float = 0.0,
     ) -> ProviderResponse:
         ...
-
-    @abstractmethod
-    async def complete_with_lora(
-        self,
-        prompt: str,
-        system: str,
-        lora_adapter: str,
-        api_key: str = "",
-        base_url: str = "",
-    ) -> ProviderResponse:
-        ...

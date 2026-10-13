@@ -11,3 +11,8 @@ dist/
 
 # Training raw data (large PDFs, not used directly)
 app/ai/training/data/raw/
+
+# Local model weights & generated training data (kept out of git)
+app/ai/serving/
+app/ai/training/data/processed/
+*.safetensors

@@ -107,29 +107,3 @@ class NIMProvider(BaseProvider):
         }
         async with self._semaphore:
             return await self._request_with_retry(client, payload, headers)
-
-    async def complete_with_lora(
-        self,
-        prompt: str,
-        system: str,
-        lora_adapter: str,
-        api_key: str = "",
-        base_url: str = "",
-    ) -> ProviderResponse:
-        key = api_key or self.api_key
-        client = await self._get_client(base_url)
-        payload: dict[str, Any] = {
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": prompt},
-            ],
-            "temperature": 0.3,
-            "max_tokens": 512,
-        }
-        headers = {
-            "Authorization": f"Bearer {key}",
-            "Content-Type": "application/json",
-            "NVCF_LORA_ADAPTER": lora_adapter,
-        }
-        async with self._semaphore:
-            return await self._request_with_retry(client, payload, headers)

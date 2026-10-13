@@ -19,12 +19,6 @@ class Settings(BaseSettings):
         description="PostgreSQL connection string (asyncpg driver)",
     )
 
-    # --- Cache ---
-    redis_url: str = Field(
-        default="redis://localhost:6379/0",
-        description="Redis connection string",
-    )
-
     # --- AI / LLM ---
     nvidia_api_key: SecretStr = Field(
         default="",

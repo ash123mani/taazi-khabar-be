@@ -1,9 +1,7 @@
-import io
 from datetime import date, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func, cast, Date
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,40 +9,10 @@ from app.deps import get_db, get_admin_user
 from app.models.user import User
 from app.models.article import Article
 from app.models.category import Category
-from app.models.ai_interaction import AIInteraction
 from app.ai.model_registry import registry
 from app.services import training_service
 
 router = APIRouter()
-
-
-@router.get("/scrape-dates", response_model=dict)
-async def list_scrape_dates(
-    days: int = Query(30, ge=1, le=90),
-    admin: User = Depends(get_admin_user),
-    db: AsyncSession = Depends(get_db),
-):
-    result = await db.execute(
-        select(Article.source, cast(Article.published_at, Date).label("d"))
-        .distinct()
-        .order_by(Article.source, cast(Article.published_at, Date).desc())
-    )
-    scraped: dict[str, set[str]] = {}
-    for row in result:
-        scraped.setdefault(row.source, set()).add(row.d.isoformat())
-
-    today = date.today()
-    date_range = [(today - timedelta(days=i)).isoformat() for i in range(days)]
-
-    sources = ["thehindu", "indianexpress"]
-    dates_dto = {}
-    for source in sources:
-        dates_dto[source] = [
-            {"date": d, "scraped": d in scraped.get(source, set())}
-            for d in date_range
-        ]
-
-    return {"dates": dates_dto}
 
 
 @router.get("/scrape-summary", response_model=dict)
@@ -496,42 +464,6 @@ async def admin_update_user_role(
     }
 
 
-@router.get("/articles-without-summary", response_model=dict)
-async def list_articles_without_summary(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=200),
-    admin: User = Depends(get_admin_user),
-    db: AsyncSession = Depends(get_db),
-):
-    result = await db.execute(
-        select(Article)
-        .where(Article.gk_summary.is_(None))
-        .order_by(Article.published_at.desc())
-        .offset(skip)
-        .limit(limit)
-    )
-    articles = result.scalars().all()
-
-    count_result = await db.execute(
-        select(func.count()).select_from(Article).where(Article.gk_summary.is_(None))
-    )
-    total = count_result.scalar()
-
-    return {
-        "total": total,
-        "articles": [
-            {
-                "id": str(a.id),
-                "source": a.source,
-                "headline": a.headline,
-                "url": a.url,
-                "published_at": a.published_at.isoformat(),
-            }
-            for a in articles
-        ],
-    }
-
-
 @router.post("/generate-summaries", response_model=dict)
 async def generate_summaries(
     data: dict,
@@ -660,29 +592,6 @@ async def list_interactions(
     ]
 
 
-@router.put("/interactions/{interaction_id}", response_model=dict)
-async def update_interaction(
-    interaction_id: UUID,
-    data: dict,
-    admin: User = Depends(get_admin_user),
-    db: AsyncSession = Depends(get_db),
-):
-    result = await db.execute(
-        select(AIInteraction).where(AIInteraction.id == interaction_id)
-    )
-    interaction = result.scalar_one_or_none()
-    if interaction is None:
-        raise HTTPException(status_code=404, detail="Interaction not found")
-
-    for key, value in data.items():
-        if hasattr(interaction, key):
-            setattr(interaction, key, value)
-
-    await db.flush()
-    await db.refresh(interaction)
-    return {"status": "updated", "id": str(interaction_id)}
-
-
 @router.get("/datasets", response_model=dict)
 async def list_datasets(
     skip: int = Query(0, ge=0),
@@ -735,24 +644,6 @@ async def create_dataset(
         "persona": dataset.persona,
         "num_examples": dataset.record_count,
     }
-
-
-@router.get("/datasets/{dataset_id}/download")
-async def download_dataset(
-    dataset_id: UUID,
-    admin: User = Depends(get_admin_user),
-    db: AsyncSession = Depends(get_db),
-):
-    dataset = await training_service.get_dataset_by_id(db=db, dataset_id=dataset_id)
-    if not dataset:
-        raise HTTPException(status_code=404, detail="Dataset not found")
-    stream = io.StringIO(dataset.dataset_jsonl)
-    filename = f"{dataset.persona}-dataset-{dataset.created_at.strftime('%Y%m%d')}.jsonl"
-    return StreamingResponse(
-        iter([stream.read()]),
-        media_type="application/jsonl",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
 
 
 @router.get("/models", response_model=dict)

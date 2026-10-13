@@ -13,17 +13,6 @@ from app.schemas.article import ArticleResponse
 router = APIRouter()
 
 
-@router.get("")
-async def list_bookmarked_ids(
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    result = await db.execute(
-        select(Bookmark.article_id).where(Bookmark.user_id == user.id)
-    )
-    return {"bookmarked_ids": [str(row[0]) for row in result.fetchall()]}
-
-
 @router.get("/articles", response_model=list[ArticleResponse])
 async def list_bookmarked_articles(
     user: User = Depends(get_current_user),

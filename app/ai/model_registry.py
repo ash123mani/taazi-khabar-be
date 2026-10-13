@@ -88,28 +88,6 @@ class ModelRegistry:
 
     # --- DB-backed async methods ---
 
-    async def db_get_active_model(
-        self, db: AsyncSession, persona: str
-    ) -> ModelConfig | None:
-        result = await db.execute(
-            select(ModelRegistryEntry).where(
-                ModelRegistryEntry.persona == persona,
-                ModelRegistryEntry.is_active == True,
-            )
-        )
-        entry = result.scalar_one_or_none()
-        if entry:
-            return ModelConfig(
-                name=entry.model_name,
-                provider=entry.provider,
-                max_tokens=entry.max_tokens,
-                temperature=entry.temperature,
-                top_p=entry.top_p,
-                frequency_penalty=entry.frequency_penalty,
-                presence_penalty=entry.presence_penalty,
-            )
-        return self.get_active_model(persona)
-
     async def db_list_models(self, db: AsyncSession) -> list[dict]:
         result = await db.execute(
             select(ModelRegistryEntry).order_by(ModelRegistryEntry.persona)

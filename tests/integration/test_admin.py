@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from uuid import uuid4
 from unittest.mock import patch
 
 from httpx import AsyncClient
@@ -57,50 +56,6 @@ class TestAdminInteractions:
 
     async def test_list_interactions_non_admin(self, client: AsyncClient, user_token: dict):
         res = await client.get("/api/admin/interactions", headers=auth_header(user_token["token"]))
-        assert res.status_code == 403
-
-    async def test_update_interaction(self, client: AsyncClient, db_session: AsyncSession, admin_token: dict):
-        interaction = await seed_interaction(db_session)
-        res = await client.put(
-            f"/api/admin/interactions/{interaction.id}",
-            json={"tokens_used": 100},
-            headers=auth_header(admin_token["token"]),
-        )
-        assert res.status_code == 200
-        assert res.json()["status"] == "updated"
-
-    async def test_update_interaction_not_found(self, client: AsyncClient, admin_token: dict):
-        res = await client.put(
-            f"/api/admin/interactions/{uuid4()}",
-            json={"tokens_used": 100},
-            headers=auth_header(admin_token["token"]),
-        )
-        assert res.status_code == 404
-
-    async def test_update_interaction_unknown_field(self, client: AsyncClient, db_session: AsyncSession, admin_token: dict):
-        interaction = await seed_interaction(db_session)
-        res = await client.put(
-            f"/api/admin/interactions/{interaction.id}",
-            json={"nonexistent_field": "value"},
-            headers=auth_header(admin_token["token"]),
-        )
-        assert res.status_code == 200
-
-    async def test_update_interaction_no_auth(self, client: AsyncClient, db_session: AsyncSession, admin_token: dict):
-        interaction = await seed_interaction(db_session)
-        res = await client.put(
-            f"/api/admin/interactions/{interaction.id}",
-            json={"tokens_used": 100},
-        )
-        assert res.status_code == 401
-
-    async def test_update_interaction_non_admin(self, client: AsyncClient, db_session: AsyncSession, admin_token: dict, user_token: dict):
-        interaction = await seed_interaction(db_session)
-        res = await client.put(
-            f"/api/admin/interactions/{interaction.id}",
-            json={"tokens_used": 100},
-            headers=auth_header(user_token["token"]),
-        )
         assert res.status_code == 403
 
 

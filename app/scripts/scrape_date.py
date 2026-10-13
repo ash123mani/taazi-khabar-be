@@ -36,7 +36,7 @@ async def scrape_date(token: str, target_date: str, source: str) -> dict:
             "/admin/scrape-date",
             headers={"Authorization": f"Bearer {token}"},
             json={"source": source, "date": target_date},
-            timeout=120.0,
+            timeout=1800.0,
         )
         r.raise_for_status()
         return r.json()
