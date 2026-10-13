@@ -1,15 +1,15 @@
 models:
   summarizer:
-    active: "meta/llama-3.1-70b-instruct"
+    active: "meta/llama-3.2-11b-vision-instruct"
     candidates:
-      - name: "meta/llama-3.1-70b-instruct"
+      - name: "meta/llama-3.2-11b-vision-instruct"
         provider: "nim"
         max_tokens: 2048
         temperature: 0.15
         top_p: 1.0
         frequency_penalty: 0.0
         presence_penalty: 0.0
-      - name: "meta/llama-3.1-8b-instruct"
+      - name: "meta/llama-3.1-70b-instruct"
         provider: "nim"
         max_tokens: 2048
         temperature: 0.15
@@ -18,16 +18,16 @@ models:
         presence_penalty: 0.0
 
   question_setter:
-    active: "nvidia/llama-3.3-nemotron-super-49b-v1.5"
+    active: "meta/llama-3.2-11b-vision-instruct"
     candidates:
-      - name: "nvidia/llama-3.3-nemotron-super-49b-v1.5"
+      - name: "meta/llama-3.2-11b-vision-instruct"
         provider: "nim"
         max_tokens: 2048
         temperature: 0.3
         top_p: 0.9
         frequency_penalty: 0.0
         presence_penalty: 0.0
-      - name: "meta/llama-3.1-70b-instruct"
+      - name: "nvidia/llama-3.3-nemotron-super-49b-v1.5"
         provider: "nim"
         max_tokens: 2048
         temperature: 0.3
@@ -36,16 +36,16 @@ models:
         presence_penalty: 0.0
 
   article_filter:
-    active: "meta/llama-3.1-8b-instruct"
+    active: "meta/llama-3.2-11b-vision-instruct"
     candidates:
-      - name: "meta/llama-3.1-8b-instruct"
+      - name: "meta/llama-3.2-11b-vision-instruct"
         provider: "nim"
         max_tokens: 64
         temperature: 0.05
         top_p: 1.0
         frequency_penalty: 0.0
         presence_penalty: 0.0
-      - name: "meta/llama-3.1-70b-instruct"
+      - name: "meta/llama-3.1-8b-instruct"
         provider: "nim"
         max_tokens: 64
         temperature: 0.05
